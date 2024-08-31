@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:dropdown_search/src/properties/clear_button_props.dart';
 import 'package:dropdown_search/src/properties/dropdown_button_props.dart';
+import 'package:dropdown_search/src/properties/infinite_scroll_props.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -17,7 +18,7 @@ export 'src/properties/clear_button_props.dart';
 export 'src/properties/dialog_props.dart';
 export 'src/properties/dropdown_button_props.dart';
 export 'src/properties/dropdown_decorator_props.dart';
-export 'src/properties/favorite_item_props.dart';
+export 'src/properties/suggested_item_props.dart';
 export 'src/properties/icon_button_props.dart';
 export 'src/properties/list_view_props.dart';
 export 'src/properties/menu_props.dart';
@@ -25,8 +26,10 @@ export 'src/properties/modal_bottom_sheet_props.dart';
 export 'src/properties/popup_props.dart';
 export 'src/properties/scrollbar_props.dart';
 export 'src/properties/text_field_props.dart';
+export 'src/properties/infinite_scroll_props.dart';
 
-typedef Future<List<T>> DropdownSearchOnFind<T>(String text);
+typedef FutureOr<List<T>> DropdownSearchOnFind<T>(
+    String filter, InfiniteScrollProps? infiniteScrollProps);
 typedef String DropdownSearchItemAsString<T>(T item);
 typedef bool DropdownSearchFilterFn<T>(T item, String filter);
 typedef bool DropdownSearchCompareFn<T>(T item1, T item2);
@@ -74,23 +77,22 @@ typedef void OnItemAdded<T>(List<T> selectedItems, T addedItem);
 typedef void OnItemRemoved<T>(List<T> selectedItems, T removedItem);
 typedef Widget PopupBuilder(BuildContext context, Widget popupWidget);
 
-///[items] are the original item from [items] or/and [asyncItems]
+///[items] are the original item from [items] or/and [items]
 typedef List<T> FavoriteItems<T>(List<T> items);
 
-enum Mode { DIALOG, MODAL_BOTTOM_SHEET, MENU, BOTTOM_SHEET }
+enum PopupMode { DIALOG, MODAL_BOTTOM_SHEET, MENU, BOTTOM_SHEET }
+
+enum Mode { FORM, AUTOCOMPLETE, CUSTOM }
 
 class DropdownSearch<T> extends StatefulWidget {
-  ///offline items list
-  final List<T> items;
-
   ///selected item
   final T? selectedItem;
 
   ///selected items
   final List<T> selectedItems;
 
-  ///function that returns item from API
-  final DropdownSearchOnFind<T>? asyncItems;
+  ///items/data
+  final DropdownSearchOnFind<T>? items;
 
   ///called when a new item is selected
   final ValueChanged<T?>? onChanged;
@@ -167,16 +169,17 @@ class DropdownSearch<T> extends StatefulWidget {
 
   ///For controlling the border radius of the dropdown inkwell
   final BorderRadius? borderRadius;
+  final Mode mode;
 
   DropdownSearch({
     Key? key,
+    this.mode = Mode.FORM,
     this.onSaved,
     this.validator,
     this.autoValidateMode = AutovalidateMode.disabled,
     this.onChanged,
-    this.items = const [],
+    this.items,
     this.selectedItem,
-    this.asyncItems,
     this.dropdownBuilder,
     this.dropdownDecoratorProps = const DropDownDecoratorProps(),
     this.clearButtonProps = const ClearButtonProps(),
@@ -191,8 +194,10 @@ class DropdownSearch<T> extends StatefulWidget {
     this.borderRadius,
     PopupProps<T> popupProps = const PopupProps.menu(),
   })  : assert(
-          !popupProps.showSelectedItems || T == String || compareFn != null,
-        ),
+            !popupProps.showSelectedItems || T == String || compareFn != null),
+        assert(mode != Mode.CUSTOM || dropdownBuilder != null),
+        assert(popupProps.infiniteScrollProps == null ||
+            popupProps.isFilterOnline),
         this.popupProps = PopupPropsMultiSelection.from(popupProps),
         this.isMultiSelectionMode = false,
         this.dropdownBuilderMultiSelection = null,
@@ -206,9 +211,9 @@ class DropdownSearch<T> extends StatefulWidget {
 
   DropdownSearch.multiSelection({
     Key? key,
+    this.mode = Mode.FORM,
     this.autoValidateMode = AutovalidateMode.disabled,
-    this.items = const [],
-    this.asyncItems,
+    this.items,
     this.dropdownDecoratorProps = const DropDownDecoratorProps(),
     this.clearButtonProps = const ClearButtonProps(),
     this.dropdownButtonProps = const DropdownButtonProps(),
@@ -227,8 +232,10 @@ class DropdownSearch<T> extends StatefulWidget {
     FormFieldValidator<List<T>>? validator,
     DropdownSearchBuilderMultiSelection<T>? dropdownBuilder,
   })  : assert(
-          !popupProps.showSelectedItems || T == String || compareFn != null,
-        ),
+            !popupProps.showSelectedItems || T == String || compareFn != null),
+        assert(mode != Mode.CUSTOM || dropdownBuilder != null),
+        assert(popupProps.infiniteScrollProps == null ||
+            popupProps.isFilterOnline),
         this.onChangedMultiSelection = onChanged,
         this.onBeforePopupOpeningMultiSelection = onBeforePopupOpening,
         this.onSavedMultiSelection = onSaved,
@@ -257,17 +264,20 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   @override
   void initState() {
     super.initState();
-    _selectedItemsNotifier.value =
-        isMultiSelectionMode ? List.from(widget.selectedItems) : _itemToList(widget.selectedItem);
+    _selectedItemsNotifier.value = isMultiSelectionMode
+        ? List.from(widget.selectedItems)
+        : _itemToList(widget.selectedItem);
   }
 
   @override
   void didUpdateWidget(DropdownSearch<T> oldWidget) {
-    List<T> oldSelectedItems =
-        isMultiSelectionMode ? oldWidget.selectedItems : _itemToList(oldWidget.selectedItem);
+    List<T> oldSelectedItems = isMultiSelectionMode
+        ? oldWidget.selectedItems
+        : _itemToList(oldWidget.selectedItem);
 
-    List<T> newSelectedItems =
-        isMultiSelectionMode ? widget.selectedItems : _itemToList(widget.selectedItem);
+    List<T> newSelectedItems = isMultiSelectionMode
+        ? widget.selectedItems
+        : _itemToList(widget.selectedItem);
 
     if (!listEquals(oldSelectedItems, newSelectedItems)) {
       _selectedItemsNotifier.value = List.from(newSelectedItems);
@@ -275,7 +285,8 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
 
     ///this code check if we need to refresh the popup widget to update
     ///containerBuilder widget
-    if (widget.popupProps.containerBuilder != oldWidget.popupProps.containerBuilder) {
+    if (widget.popupProps.containerBuilder !=
+        oldWidget.popupProps.containerBuilder) {
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
         _popupStateKey.currentState?.setState(() {});
       });
@@ -286,20 +297,31 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<List<T?>>(
+    return ValueListenableBuilder<List<T>>(
       valueListenable: _selectedItemsNotifier,
       builder: (context, data, wt) {
         return IgnorePointer(
           ignoring: !widget.enabled,
           child: InkWell(
+            //todo add properties
             borderRadius: widget.borderRadius,
             overlayColor: widget.overlayColor,
             onTap: () => _selectSearchMode(),
-            child: _formField(),
+            child: dropDown(),
           ),
         );
       },
     );
+  }
+
+  Widget dropDown() {
+    if (widget.mode == Mode.CUSTOM) {
+      return _customField();
+    } else if (widget.mode == Mode.AUTOCOMPLETE) {
+      return _formField();
+    } else {
+      return _formField();
+    }
   }
 
   List<T> _itemToList(T? item) {
@@ -359,7 +381,9 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
         );
       else if (isMultiSelectionMode) {
         return Wrap(
-          children: getSelectedItems.map((e) => defaultItemMultiSelectionMode(e)).toList(),
+          children: getSelectedItems
+              .map((e) => defaultItemMultiSelectionMode(e))
+              .toList(),
         );
       }
       return Text(
@@ -373,7 +397,13 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   }
 
   Widget _formField() {
-    return isMultiSelectionMode ? _formFieldMultiSelection() : _formFieldSingleSelection();
+    return isMultiSelectionMode
+        ? _formFieldMultiSelection()
+        : _formFieldSingleSelection();
+  }
+
+  Widget _customField() {
+    return _defaultSelectedItemWidget();
   }
 
   Widget _formFieldSingleSelection() {
@@ -397,9 +427,13 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
               return InputDecorator(
                 baseStyle: widget.dropdownDecoratorProps.baseStyle,
                 textAlign: widget.dropdownDecoratorProps.textAlign,
-                textAlignVertical: widget.dropdownDecoratorProps.textAlignVertical,
-                isEmpty: getSelectedItem == null && widget.dropdownBuilder == null,
+                textAlignVertical:
+                    widget.dropdownDecoratorProps.textAlignVertical,
+                isEmpty:
+                    getSelectedItem == null && widget.dropdownBuilder == null,
                 isFocused: isFocused,
+                expands: widget.dropdownDecoratorProps.expands,
+                isHovering: widget.dropdownDecoratorProps.isHovering,
                 decoration: _manageDropdownDecoration(state),
                 child: _defaultSelectedItemWidget(),
               );
@@ -429,8 +463,10 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
               return InputDecorator(
                 baseStyle: widget.dropdownDecoratorProps.baseStyle,
                 textAlign: widget.dropdownDecoratorProps.textAlign,
-                textAlignVertical: widget.dropdownDecoratorProps.textAlignVertical,
-                isEmpty: getSelectedItems.isEmpty && widget.dropdownBuilderMultiSelection == null,
+                textAlignVertical:
+                    widget.dropdownDecoratorProps.textAlignVertical,
+                isEmpty: getSelectedItems.isEmpty &&
+                    widget.dropdownBuilderMultiSelection == null,
                 isFocused: isFocused,
                 decoration: _manageDropdownDecoration(state),
                 child: _defaultSelectedItemWidget(),
@@ -505,8 +541,11 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
             style: widget.dropdownButtonProps.style,
             isSelected: widget.dropdownButtonProps.isSelected,
             selectedIcon: widget.dropdownButtonProps.selectedIcon,
-            onPressed: widget.dropdownButtonProps.onPressed ?? dropdownButtonPressed,
-            icon: widget.dropdownButtonProps.icon,
+            onPressed:
+                widget.dropdownButtonProps.onPressed ?? dropdownButtonPressed,
+            icon: isFocused
+                ? widget.dropdownButtonProps.iconOpened
+                : widget.dropdownButtonProps.icon,
             constraints: widget.dropdownButtonProps.constraints,
             hoverColor: widget.dropdownButtonProps.hoverColor,
             highlightColor: widget.dropdownButtonProps.highlightColor,
@@ -533,9 +572,11 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
     // Calculate the show-up area for the dropdown using button's size & position based on the `overlay` used as the coordinate space.
     return RelativeRect.fromSize(
       Rect.fromPoints(
-        popupButtonObject.localToGlobal(popupButtonObject.size.bottomLeft(Offset.zero),
+        popupButtonObject.localToGlobal(
+            popupButtonObject.size.bottomLeft(Offset.zero),
             ancestor: overlay),
-        popupButtonObject.localToGlobal(popupButtonObject.size.bottomRight(Offset.zero),
+        popupButtonObject.localToGlobal(
+            popupButtonObject.size.bottomRight(Offset.zero),
             ancestor: overlay),
       ),
       Size(overlay.size.width, overlay.size.height),
@@ -549,18 +590,22 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       barrierDismissible: widget.popupProps.dialogProps.barrierDismissible,
       barrierLabel: widget.popupProps.dialogProps.barrierLabel,
       transitionDuration: widget.popupProps.dialogProps.transitionDuration,
-      barrierColor: widget.popupProps.dialogProps.barrierColor ?? Colors.black54,
+      barrierColor:
+          widget.popupProps.dialogProps.barrierColor ?? Colors.black54,
       useRootNavigator: widget.popupProps.dialogProps.useRootNavigator,
       anchorPoint: widget.popupProps.dialogProps.anchorPoint,
       transitionBuilder: widget.popupProps.dialogProps.transitionBuilder,
       pageBuilder: (context, animation, secondaryAnimation) {
         return AlertDialog(
           buttonPadding: widget.popupProps.dialogProps.buttonPadding,
-          actionsOverflowButtonSpacing: widget.popupProps.dialogProps.actionsOverflowButtonSpacing,
+          actionsOverflowButtonSpacing:
+              widget.popupProps.dialogProps.actionsOverflowButtonSpacing,
           insetPadding: widget.popupProps.dialogProps.insetPadding,
           actionsPadding: widget.popupProps.dialogProps.actionsPadding,
-          actionsOverflowDirection: widget.popupProps.dialogProps.actionsOverflowDirection,
-          actionsOverflowAlignment: widget.popupProps.dialogProps.actionsOverflowAlignment,
+          actionsOverflowDirection:
+              widget.popupProps.dialogProps.actionsOverflowDirection,
+          actionsOverflowAlignment:
+              widget.popupProps.dialogProps.actionsOverflowAlignment,
           actionsAlignment: widget.popupProps.dialogProps.actionsAlignment,
           actions: widget.popupProps.dialogProps.actions,
           alignment: widget.popupProps.dialogProps.alignment,
@@ -579,12 +624,16 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   Future _openBottomSheet() {
     return showBottomSheet(
       context: context,
+      showDragHandle: widget.popupProps.bottomSheetProps.showDragHandle,
+      sheetAnimationStyle:
+          widget.popupProps.bottomSheetProps.sheetAnimationStyle,
       enableDrag: widget.popupProps.bottomSheetProps.enableDrag,
       backgroundColor: widget.popupProps.bottomSheetProps.backgroundColor,
       clipBehavior: widget.popupProps.bottomSheetProps.clipBehavior,
       elevation: widget.popupProps.bottomSheetProps.elevation,
       shape: widget.popupProps.bottomSheetProps.shape,
-      transitionAnimationController: widget.popupProps.bottomSheetProps.animation,
+      transitionAnimationController:
+          widget.popupProps.bottomSheetProps.transitionAnimationController,
       constraints: widget.popupProps.bottomSheetProps.constraints,
       builder: (ctx) => _popupWidgetInstance(),
     ).closed;
@@ -595,21 +644,31 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
     final sheetTheme = Theme.of(context).bottomSheetTheme;
     return showModalBottomSheet<T>(
       context: context,
+      barrierLabel: widget.popupProps.modalBottomSheetProps.barrierLabel,
+      scrollControlDisabledMaxHeightRatio: widget
+          .popupProps.modalBottomSheetProps.scrollControlDisabledMaxHeightRatio,
+      showDragHandle: widget.popupProps.modalBottomSheetProps.showDragHandle,
+      sheetAnimationStyle:
+          widget.popupProps.modalBottomSheetProps.sheetAnimationStyle,
       useSafeArea: widget.popupProps.modalBottomSheetProps.useSafeArea,
       barrierColor: widget.popupProps.modalBottomSheetProps.barrierColor,
-      backgroundColor: widget.popupProps.modalBottomSheetProps.backgroundColor ??
-          sheetTheme.modalBackgroundColor ??
-          sheetTheme.backgroundColor ??
-          Colors.white,
+      backgroundColor:
+          widget.popupProps.modalBottomSheetProps.backgroundColor ??
+              sheetTheme.modalBackgroundColor ??
+              sheetTheme.backgroundColor ??
+              Colors.white,
       isDismissible: widget.popupProps.modalBottomSheetProps.barrierDismissible,
-      isScrollControlled: widget.popupProps.modalBottomSheetProps.isScrollControlled,
+      isScrollControlled:
+          widget.popupProps.modalBottomSheetProps.isScrollControlled,
       enableDrag: widget.popupProps.modalBottomSheetProps.enableDrag,
       clipBehavior: widget.popupProps.modalBottomSheetProps.clipBehavior,
       elevation: widget.popupProps.modalBottomSheetProps.elevation,
       shape: widget.popupProps.modalBottomSheetProps.shape,
       anchorPoint: widget.popupProps.modalBottomSheetProps.anchorPoint,
-      useRootNavigator: widget.popupProps.modalBottomSheetProps.useRootNavigator,
-      transitionAnimationController: widget.popupProps.modalBottomSheetProps.animation,
+      useRootNavigator:
+          widget.popupProps.modalBottomSheetProps.useRootNavigator,
+      transitionAnimationController:
+          widget.popupProps.modalBottomSheetProps.animation,
       constraints: widget.popupProps.modalBottomSheetProps.constraints,
       builder: (ctx) => _popupWidgetInstance(),
     );
@@ -640,7 +699,6 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       itemAsString: widget.itemAsString,
       filterFn: widget.filterFn,
       items: widget.items,
-      asyncItems: widget.asyncItems,
       onChanged: _handleOnChangeSelectedItems,
       compareFn: widget.compareFn,
       isMultiSelectionMode: isMultiSelectionMode,
@@ -669,14 +727,16 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
     };
 
     if (widget.onBeforeChange != null) {
-      widget.onBeforeChange!(getSelectedItem, selectedItems.isEmpty ? null : selectedItems.first)
+      widget.onBeforeChange!(getSelectedItem,
+              selectedItems.isEmpty ? null : selectedItems.first)
           .then((value) {
         if (value == true) {
           changeItem();
         }
       });
     } else if (widget.onBeforeChangeMultiSelection != null) {
-      widget.onBeforeChangeMultiSelection!(getSelectedItems, selectedItems).then((value) {
+      widget.onBeforeChangeMultiSelection!(getSelectedItems, selectedItems)
+          .then((value) {
         if (value == true) {
           changeItem();
         }
@@ -705,15 +765,16 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
     if (widget.onBeforePopupOpening != null) {
       if (await widget.onBeforePopupOpening!(getSelectedItem) == false) return;
     } else if (widget.onBeforePopupOpeningMultiSelection != null) {
-      if (await widget.onBeforePopupOpeningMultiSelection!(getSelectedItems) == false) return;
+      if (await widget.onBeforePopupOpeningMultiSelection!(getSelectedItems) ==
+          false) return;
     }
 
     _handleFocus(true);
-    if (widget.popupProps.mode == Mode.MENU) {
+    if (widget.popupProps.mode == PopupMode.MENU) {
       await _openMenu();
-    } else if (widget.popupProps.mode == Mode.MODAL_BOTTOM_SHEET) {
+    } else if (widget.popupProps.mode == PopupMode.MODAL_BOTTOM_SHEET) {
       await _openModalBottomSheet();
-    } else if (widget.popupProps.mode == Mode.BOTTOM_SHEET) {
+    } else if (widget.popupProps.mode == PopupMode.BOTTOM_SHEET) {
       await _openBottomSheet();
     } else {
       await _openSelectDialog();
@@ -732,19 +793,21 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   ///Change selected Value; this function is public USED to change the selected
   ///value PROGRAMMATICALLY, Otherwise you can use [_handleOnChangeSelectedItems]
   ///for SingleSelection mode you can use [changeSelectedItem]
-  void changeSelectedItems(List<T> selectedItems) => _handleOnChangeSelectedItems(selectedItems);
+  void changeSelectedItems(List<T> selectedItems) =>
+      _handleOnChangeSelectedItems(selectedItems);
 
   ///function to remove an item from the list
   ///Useful in multiSelection mode to delete an item
-  void removeItem(T itemToRemove) =>
-      _handleOnChangeSelectedItems(getSelectedItems..removeWhere((i) => _isEqual(itemToRemove, i)));
+  void removeItem(T itemToRemove) => _handleOnChangeSelectedItems(
+      getSelectedItems..removeWhere((i) => _isEqual(itemToRemove, i)));
 
   ///Change selected Value; this function is public USED to clear selected
   ///value PROGRAMMATICALLY, Otherwise you can use [_handleOnChangeSelectedItems]
   void clear() => _handleOnChangeSelectedItems([]);
 
   ///get selected value programmatically USED for SINGLE_SELECTION mode
-  T? get getSelectedItem => getSelectedItems.isEmpty ? null : getSelectedItems.first;
+  T? get getSelectedItem =>
+      getSelectedItems.isEmpty ? null : getSelectedItems.first;
 
   ///get selected values programmatically
   List<T> get getSelectedItems => _selectedItemsNotifier.value;
@@ -801,10 +864,12 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   void closeDropDownSearch() => _popupStateKey.currentState?.closePopup();
 
   ///returns true if all popup's items are selected; other wise False
-  bool get popupIsAllItemSelected => _popupStateKey.currentState?.isAllItemSelected ?? false;
+  bool get popupIsAllItemSelected =>
+      _popupStateKey.currentState?.isAllItemSelected ?? false;
 
   ///returns popup selected items
-  List<T> get popupGetSelectedItems => _popupStateKey.currentState?.getSelectedItem ?? [];
+  List<T> get popupGetSelectedItems =>
+      _popupStateKey.currentState?.getSelectedItem ?? [];
 
   void updatePopupState() => _popupStateKey.currentState?.setState(() {});
 }

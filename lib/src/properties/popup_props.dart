@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../dropdown_search.dart';
+import 'infinite_scroll_props.dart';
 
 class PopupProps<T> {
   ///popup title
@@ -42,7 +43,7 @@ class PopupProps<T> {
   final DropdownSearchPopupItemEnabled<T>? disabledItemFn;
 
   ///popup mode
-  final Mode mode;
+  final PopupMode mode;
 
   ///select the selected item in the menu/dialog/bottomSheet of items
   final bool showSelectedItems;
@@ -50,8 +51,8 @@ class PopupProps<T> {
   ///true if the filter on items is applied onlie (via API/DB/...)
   final bool isFilterOnline;
 
-  ///favorite items props
-  final FavoriteItemProps<T> favoriteItemProps;
+  ///suggested items props
+  final SuggestedItemProps<T> suggestedItemProps;
 
   ///dialog mode props
   final DialogProps dialogProps;
@@ -79,8 +80,11 @@ class PopupProps<T> {
   ///if true , the callbacks (onTap, onLongClick...) will be handled by the user
   final bool interceptCallBacks;
 
+  ///infinite scroll params like skip (offset), take,...
+  final InfiniteScrollProps? infiniteScrollProps;
+
   const PopupProps._({
-    this.mode = Mode.MENU,
+    this.mode = PopupMode.MENU,
     this.fit = FlexFit.tight,
     this.title,
     this.showSearchBox = false,
@@ -91,7 +95,7 @@ class PopupProps<T> {
     this.searchFieldProps = const TextFieldProps(),
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
-    this.favoriteItemProps = const FavoriteItemProps(),
+    this.suggestedItemProps = const SuggestedItemProps(),
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -104,6 +108,7 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(),
     this.interceptCallBacks = false,
+    this.infiniteScrollProps,
   });
 
   const PopupProps.menu({
@@ -114,7 +119,7 @@ class PopupProps<T> {
     this.searchFieldProps = const TextFieldProps(),
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
-    this.favoriteItemProps = const FavoriteItemProps(),
+    this.suggestedItemProps = const SuggestedItemProps(),
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -127,7 +132,8 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(maxHeight: 350),
     this.interceptCallBacks = false,
-  })  : this.mode = Mode.MENU,
+    this.infiniteScrollProps,
+  })  : this.mode = PopupMode.MENU,
         this.bottomSheetProps = const BottomSheetProps(),
         this.dialogProps = const DialogProps(),
         this.modalBottomSheetProps = const ModalBottomSheetProps();
@@ -140,7 +146,7 @@ class PopupProps<T> {
     this.searchFieldProps = const TextFieldProps(),
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
-    this.favoriteItemProps = const FavoriteItemProps(),
+    this.suggestedItemProps = const SuggestedItemProps(),
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -157,7 +163,8 @@ class PopupProps<T> {
       maxHeight: 600,
     ),
     this.interceptCallBacks = false,
-  })  : this.mode = Mode.DIALOG,
+    this.infiniteScrollProps,
+  })  : this.mode = PopupMode.DIALOG,
         this.menuProps = const MenuProps(),
         this.bottomSheetProps = const BottomSheetProps(),
         this.modalBottomSheetProps = const ModalBottomSheetProps();
@@ -170,7 +177,7 @@ class PopupProps<T> {
     this.searchFieldProps = const TextFieldProps(),
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
-    this.favoriteItemProps = const FavoriteItemProps(),
+    this.suggestedItemProps = const SuggestedItemProps(),
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -183,7 +190,8 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(maxHeight: 500),
     this.interceptCallBacks = false,
-  })  : this.mode = Mode.BOTTOM_SHEET,
+    this.infiniteScrollProps,
+  })  : this.mode = PopupMode.BOTTOM_SHEET,
         this.menuProps = const MenuProps(),
         this.dialogProps = const DialogProps(),
         this.modalBottomSheetProps = const ModalBottomSheetProps();
@@ -196,7 +204,7 @@ class PopupProps<T> {
     this.searchFieldProps = const TextFieldProps(),
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
-    this.favoriteItemProps = const FavoriteItemProps(),
+    this.suggestedItemProps = const SuggestedItemProps(),
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -209,7 +217,8 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(maxHeight: 500),
     this.interceptCallBacks = false,
-  })  : this.mode = Mode.MODAL_BOTTOM_SHEET,
+    this.infiniteScrollProps,
+  })  : this.mode = PopupMode.MODAL_BOTTOM_SHEET,
         this.menuProps = const MenuProps(),
         this.dialogProps = const DialogProps(),
         this.bottomSheetProps = const BottomSheetProps();
@@ -231,7 +240,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
   final TextDirection textDirection;
 
   const PopupPropsMultiSelection._({
-    super.mode = Mode.MENU,
+    super.mode = PopupMode.MENU,
     super.fit = FlexFit.tight,
     super.title,
     super.isFilterOnline,
@@ -239,7 +248,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.disabledItemFn,
     super.showSearchBox,
     super.searchFieldProps = const TextFieldProps(),
-    super.favoriteItemProps = const FavoriteItemProps(),
+    super.suggestedItemProps = const SuggestedItemProps(),
     super.modalBottomSheetProps = const ModalBottomSheetProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
@@ -255,6 +264,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.containerBuilder,
     super.constraints = const BoxConstraints(maxHeight: 350),
     super.interceptCallBacks = false,
+    super.infiniteScrollProps,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
@@ -268,7 +278,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.showSearchBox = false,
     super.searchFieldProps = const TextFieldProps(),
     super.menuProps = const MenuProps(),
-    super.favoriteItemProps = const FavoriteItemProps(),
+    super.suggestedItemProps = const SuggestedItemProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
     super.searchDelay,
@@ -283,6 +293,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.containerBuilder,
     super.constraints = const BoxConstraints(maxHeight: 350),
     super.interceptCallBacks = false,
+    super.infiniteScrollProps,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
@@ -297,7 +308,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.searchFieldProps = const TextFieldProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
-    super.favoriteItemProps = const FavoriteItemProps(),
+    super.suggestedItemProps = const SuggestedItemProps(),
     super.dialogProps = const DialogProps(),
     super.searchDelay,
     super.onDismissed,
@@ -315,6 +326,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
       maxHeight: 600,
     ),
     super.interceptCallBacks = false,
+    super.infiniteScrollProps,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
@@ -328,7 +340,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.showSearchBox = false,
     super.searchFieldProps = const TextFieldProps(),
     super.listViewProps = const ListViewProps(),
-    super.favoriteItemProps = const FavoriteItemProps(),
+    super.suggestedItemProps = const SuggestedItemProps(),
     super.bottomSheetProps = const BottomSheetProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.searchDelay,
@@ -343,6 +355,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.containerBuilder,
     super.constraints = const BoxConstraints(maxHeight: 500),
     super.interceptCallBacks = false,
+    super.infiniteScrollProps,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
@@ -358,7 +371,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.disabledItemFn,
     super.showSearchBox,
     super.searchFieldProps = const TextFieldProps(),
-    super.favoriteItemProps = const FavoriteItemProps(),
+    super.suggestedItemProps = const SuggestedItemProps(),
     super.modalBottomSheetProps = const ModalBottomSheetProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
@@ -371,6 +384,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.containerBuilder,
     super.constraints = const BoxConstraints(maxHeight: 500),
     super.interceptCallBacks = false,
+    super.infiniteScrollProps,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
@@ -382,7 +396,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
       : this._(
           title: popupProps.title,
           fit: popupProps.fit,
-          favoriteItemProps: popupProps.favoriteItemProps,
+          suggestedItemProps: popupProps.suggestedItemProps,
           disabledItemFn: popupProps.disabledItemFn,
           emptyBuilder: popupProps.emptyBuilder,
           errorBuilder: popupProps.errorBuilder,
@@ -409,5 +423,6 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
           selectionWidget: null,
           validationWidgetBuilder: null,
           textDirection: TextDirection.ltr,
+          infiniteScrollProps: popupProps.infiniteScrollProps,
         );
 }

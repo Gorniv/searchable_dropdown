@@ -45,12 +45,16 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
   bool? _popupBuilderSelection = false;
 
+  final longList = List.generate(110, (i) => i+1);
+
+
   @override
   Widget build(BuildContext context) {
     void _handleCheckBoxState({bool updateState = true}) {
       var selectedItem = _popupBuilderKey.currentState?.popupGetSelectedItems ?? [];
       var isAllSelected = _popupBuilderKey.currentState?.popupIsAllItemSelected ?? false;
       _popupBuilderSelection = selectedItem.isEmpty ? false : (isAllSelected ? true : null);
+
 
       if (updateState) setState(() {});
     }
@@ -72,16 +76,19 @@ class _MyHomePageState extends State<MyHomePage> {
               Divider(),
               Row(
                 children: [
-                  Expanded(
-                    child: DropdownSearch<int>(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                  DropdownSearch<int>(
+                    mode: Mode.CUSTOM,
+                    items:  (f, cs ) =>[10000, 2, 3, 4, 5, 6, 7],
+                    dropdownBuilder: (context, selectedItem) => Icon(Icons.access_alarm),
+                    popupProps: PopupProps.menu(
+                      constraints: BoxConstraints.tight(Size(200, 100))
                     ),
                   ),
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>.multiSelection(
                       clearButtonProps: ClearButtonProps(isVisible: true),
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs ) =>[1, 2, 3, 4, 5, 6, 7],
                     ),
                   )
                 ],
@@ -95,14 +102,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                     ),
                   ),
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>.multiSelection(
                       key: _popupCustomValidationKey,
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                       popupProps: PopupPropsMultiSelection.dialog(
                         validationWidgetBuilder: (ctx, selectedItems) {
                           return Container(
@@ -129,7 +136,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                       dropdownDecoratorProps: DropDownDecoratorProps(
                         dropdownSearchDecoration: InputDecoration(
                           labelText: "BottomSheet mode",
@@ -143,7 +150,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                       dropdownDecoratorProps: DropDownDecoratorProps(
                         dropdownSearchDecoration: InputDecoration(
                           labelText: "Modal mode",
@@ -167,14 +174,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<UserModel>(
-                      asyncItems: (filter) => getData(filter),
+                      items: (filter, t) => getData(filter),
                       compareFn: (i, s) => i.isEqual(s),
                       popupProps: PopupPropsMultiSelection.modalBottomSheet(
                         isFilterOnline: true,
                         showSelectedItems: true,
                         showSearchBox: true,
                         itemBuilder: _customPopupItemBuilderExample2,
-                        favoriteItemProps: FavoriteItemProps(
+                        suggestedItemProps: SuggestedItemProps(
                           showFavoriteItems: true,
                           favoriteItems: (us) {
                             return us.where((e) => e.name.contains("Mrs")).toList();
@@ -186,12 +193,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<UserModel>.multiSelection(
-                      asyncItems: (filter) => getData(filter),
+                      items: (filter, s) =>  getData(filter),
                       compareFn: (i, s) => i.isEqual(s),
                       popupProps: PopupPropsMultiSelection.modalBottomSheet(
                         showSearchBox: true,
                         itemBuilder: _customPopupItemBuilderExample2,
-                        favoriteItemProps: FavoriteItemProps(
+                        suggestedItemProps: SuggestedItemProps(
                           showFavoriteItems: true,
                           favoriteItems: (us) {
                             return us.where((e) => e.name.contains("Mrs")).toList();
@@ -231,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                       autoValidateMode: AutovalidateMode.onUserInteraction,
                       validator: (int? i) {
                         if (i == null)
@@ -245,7 +252,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>.multiSelection(
-                      items: [1, 2, 3, 4, 5, 6, 7],
+                      items:  (f, cs) =>[1, 2, 3, 4, 5, 6, 7],
                       validator: (List<int>? items) {
                         if (items == null || items.isEmpty)
                           return 'required filed';
@@ -262,7 +269,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Text("[custom popup background examples]"),
               Divider(),
               DropdownSearch<String>(
-                items: List.generate(5, (index) => "$index"),
+                items:  (f, cs) =>List.generate(5, (index) => "$index"),
                 popupProps: PopupProps.menu(
                   fit: FlexFit.loose,
                   menuProps: MenuProps(
@@ -297,13 +304,20 @@ class _MyHomePageState extends State<MyHomePage> {
               Row(
                 children: [
                   Expanded(
-                    child: DropdownSearch<String>.multiSelection(
+                    child: DropdownSearch<int>.multiSelection(
                       key: _popupBuilderKey,
-                      items: List.generate(30, (index) => "$index"),
+                      items:  (f, ic) {
+                        return Future.delayed(Duration(seconds: 1), () {
+                          if(f.isEmpty) return longList.skip(ic!.skip).take(ic.take).toList();
+                          else return longList.where((l)=> l.toString().contains(f)).skip(ic!.skip).take(ic.take).toList();
+                        });
+                      } ,
                       popupProps: PopupPropsMultiSelection.dialog(
                         onItemAdded: (l, s) => _handleCheckBoxState(),
                         onItemRemoved: (l, s) => _handleCheckBoxState(),
+                        infiniteScrollProps: InfiniteScrollProps(skip: 0, take: 10),
                         showSearchBox: true,
+                        isFilterOnline: true,
                         containerBuilder: (ctx, popupWidget) {
                           return _CheckBoxWidget(
                             child: popupWidget,
@@ -323,7 +337,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Expanded(
                     child: DropdownSearch<String>.multiSelection(
                       key: _multiKey,
-                      items: List.generate(30, (index) => "$index"),
+                      items:  (f, cs) =>List.generate(30, (index) => "$index"),
                       popupProps: PopupPropsMultiSelection.dialog(
                         onItemAdded: (l, s) => _handleCheckBoxState(),
                         onItemRemoved: (l, s) => _handleCheckBoxState(),
@@ -385,7 +399,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<UserModel>.multiSelection(
-                      asyncItems: (String? filter) => getData(filter),
+                      items: (filter, t) => getData(filter),
                       clearButtonProps: ClearButtonProps(isVisible: true),
                       popupProps: PopupPropsMultiSelection.modalBottomSheet(
                         showSelectedItems: true,
@@ -418,7 +432,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<UserModel>(
-                      asyncItems: (String? filter) => getData(filter),
+                      items: (filter, t) => getData(filter),
                       popupProps: PopupPropsMultiSelection.modalBottomSheet(
                         showSelectedItems: true,
                         itemBuilder: _customPopupItemBuilderExample2,
@@ -445,7 +459,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: List.generate(50, (i) => i),
+                      items:  (f, cs) =>List.generate(50, (i) => i),
                       popupProps: PopupProps.menu(
                         showSearchBox: true,
                         title: Text('default fit'),
@@ -455,7 +469,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: List.generate(50, (i) => i),
+                      items:  (f, cs) =>List.generate(50, (i) => i),
                       popupProps: PopupProps.menu(
                         title: Text('With fit to loose and no constraints'),
                         showSearchBox: true,
@@ -472,7 +486,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 children: [
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: List.generate(50, (i) => i),
+                      items:  (f, cs) =>List.generate(50, (i) => i),
                       popupProps: PopupProps.menu(
                         showSearchBox: true,
                         fit: FlexFit.loose,
@@ -484,7 +498,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Padding(padding: EdgeInsets.all(4)),
                   Expanded(
                     child: DropdownSearch<int>(
-                      items: List.generate(50, (i) => i),
+                      items:  (f, cs) =>List.generate(50, (i) => i),
                       popupProps: PopupProps.menu(
                         title: Text('fit to a specific width and height'),
                         showSearchBox: true,
@@ -505,7 +519,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Divider(),
               DropdownSearch<int>(
                 key: _openDropDownProgKey,
-                items: [1, 2, 3],
+                items:  (f, cs) =>[1, 2, 3],
               ),
               Padding(padding: EdgeInsets.all(4)),
               ElevatedButton(
@@ -528,7 +542,7 @@ class _MyHomePageState extends State<MyHomePage> {
               Divider(),
               DropdownSearch<MultiLevelString>(
                 key: myKey,
-                items: myItems,
+                items:  (f, cs) =>myItems,
                 compareFn: (i1, i2) => i1.level1 == i2.level1,
                 popupProps: PopupProps.menu(
                   showSelectedItems: true,
@@ -680,11 +694,12 @@ class CheckBoxState extends State<_CheckBoxWidget> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(24)),
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            Color(0x88F44336),
+            Color(0xF44336),
             Colors.blue,
           ],
         ),
@@ -692,21 +707,24 @@ class CheckBoxState extends State<_CheckBoxWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text('Select: '),
-              Checkbox(
-                  value: isSelected,
-                  tristate: true,
-                  onChanged: (bool? v) {
-                    if (v == null) v = false;
-                    setState(() {
-                      isSelected = v;
-                      if (widget.onChanged != null) widget.onChanged!(v);
-                    });
-                  }),
-            ],
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text('Select: '),
+                Checkbox(
+                    value: isSelected,
+                    tristate: true,
+                    onChanged: (bool? v) {
+                      if (v == null) v = false;
+                      setState(() {
+                        isSelected = v;
+                        if (widget.onChanged != null) widget.onChanged!(v);
+                      });
+                    }),
+              ],
+            ),
           ),
           Expanded(child: widget.child),
         ],
