@@ -32,6 +32,7 @@ typedef FutureOr<List<T>> DropdownSearchOnFind<T>(
     String filter, InfiniteScrollProps? infiniteScrollProps);
 typedef String DropdownSearchItemAsString<T>(T item);
 typedef bool DropdownSearchFilterFn<T>(T item, String filter);
+typedef int DropdownSortFilterFn<T>(T item1, T item2, String filter);
 typedef bool DropdownSearchCompareFn<T>(T item1, T item2);
 typedef Widget DropdownSearchBuilder<T>(BuildContext context, T? selectedItem);
 typedef Widget DropdownSearchBuilderMultiSelection<T>(
@@ -112,6 +113,9 @@ class DropdownSearch<T> extends StatefulWidget {
   ///	custom filter function
   final DropdownSearchFilterFn<T>? filterFn;
 
+  /// custom sort function after filtering
+  final DropdownSortFilterFn<T>? sortFilterFn;
+
   ///enable/disable dropdownSearch
   final bool enabled;
 
@@ -186,6 +190,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.dropdownButtonProps = const DropdownButtonProps(),
     this.enabled = true,
     this.filterFn,
+    this.sortFilterFn,
     this.itemAsString,
     this.compareFn,
     this.onBeforeChange,
@@ -219,6 +224,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.dropdownButtonProps = const DropdownButtonProps(),
     this.enabled = true,
     this.filterFn,
+    this.sortFilterFn,
     this.itemAsString,
     this.compareFn,
     this.selectedItems = const [],
@@ -698,6 +704,7 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       popupProps: widget.popupProps,
       itemAsString: widget.itemAsString,
       filterFn: widget.filterFn,
+      sortFilterFn: widget.sortFilterFn,
       items: widget.items,
       onChanged: _handleOnChangeSelectedItems,
       compareFn: widget.compareFn,

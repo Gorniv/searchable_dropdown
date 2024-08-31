@@ -237,6 +237,13 @@ class UserModel {
 }
 ```
 
+## Sort filtered items
+```dart
+ filterFn: filterFn,
+ sortFilterFn: (T itemA, T itemB, String filter) => tokenSortRatio(itemB.toString(), filter).compareTo(tokenSortRatio(itemA.toString(), filter)),
+```
+where tokenSortRatio from [fuzzywuzzy](https://pub.dev/packages/fuzzywuzzy)
+
 # [View more Examples](https://github.com/salim-lachdhaf/searchable_dropdown/tree/master/example)
 
 ## Support

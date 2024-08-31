@@ -12,6 +12,7 @@ class SelectionWidget<T> extends StatefulWidget {
   final DropdownSearchOnFind<T>? items;
   final DropdownSearchItemAsString<T>? itemAsString;
   final DropdownSearchFilterFn<T>? filterFn;
+  final DropdownSortFilterFn<T>? sortFilterFn;
   final DropdownSearchCompareFn<T>? compareFn;
   final List<T> defaultSelectedItems;
   final PopupPropsMultiSelection<T> popupProps;
@@ -23,9 +24,10 @@ class SelectionWidget<T> extends StatefulWidget {
     this.defaultSelectedItems = const [],
     this.isMultiSelectionMode = false,
     this.onChanged,
-    this.items ,
+    this.items,
     this.itemAsString,
     this.filterFn,
+    this.sortFilterFn,
     this.compareFn,
   }) : super(key: key);
 
@@ -49,7 +51,9 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
   void searchBoxControllerListener() {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(widget.popupProps.searchDelay, () {
-      _manageLoadMoreItems(searchBoxController.text, widget.popupProps.infiniteScrollProps, isFirstLoad: true);
+      _manageLoadMoreItems(
+          searchBoxController.text, widget.popupProps.infiniteScrollProps,
+          isFirstLoad: true);
     });
   }
 
@@ -66,7 +70,9 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
     Future.delayed(
       Duration.zero,
-      () => _manageLoadMoreItems(searchBoxController.text, widget.popupProps.infiniteScrollProps, isFirstLoad: true),
+      () => _manageLoadMoreItems(
+          searchBoxController.text, widget.popupProps.infiniteScrollProps,
+          isFirstLoad: true),
     );
   }
 
@@ -212,21 +218,26 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                                   .popupProps.listViewProps.itemExtentBuilder,
                               findChildIndexCallback: widget.popupProps
                                   .listViewProps.findChildIndexCallback,
-                              itemCount: itemCount + (isInfiniteScrollEnded ? 0 : 1),
+                              itemCount:
+                                  itemCount + (isInfiniteScrollEnded ? 0 : 1),
                               itemBuilder: (context, index) {
-                                if(index < itemCount){
+                                if (index < itemCount) {
                                   var item = snapshot.data![index];
                                   return widget.isMultiSelectionMode
                                       ? _itemWidgetMultiSelection(item)
                                       : _itemWidgetSingleSelection(item);
                                 }
                                 //if infiniteScroll enabled && data received not less then take request
-                                else if(!isInfiniteScrollEnded) {
+                                else if (!isInfiniteScrollEnded) {
                                   _manageLoadMoreItems(
                                     searchBoxController.text,
-                                    InfiniteScrollProps(skip: itemCount, take: widget.popupProps.infiniteScrollProps!.take),
+                                    InfiniteScrollProps(
+                                        skip: itemCount,
+                                        take: widget.popupProps
+                                            .infiniteScrollProps!.take),
                                   );
-                                  return Center(child:CircularProgressIndicator());
+                                  return Center(
+                                      child: CircularProgressIndicator());
                                 }
 
                                 return SizedBox.shrink();
@@ -328,7 +339,9 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
         });
   }
 
-  Future<void> _manageLoadMoreItems(String filter, InfiniteScrollProps? infiniteScrollProps, {bool isFirstLoad = false}) async {
+  Future<void> _manageLoadMoreItems(
+      String filter, InfiniteScrollProps? infiniteScrollProps,
+      {bool isFirstLoad = false}) async {
     if (widget.items == null) return;
 
     List<T> _applyFilter(String filter) {
@@ -350,23 +363,28 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
     try {
       //case filtering locally (no need to load new data)
-      if(!isFirstLoad && !widget.popupProps.isFilterOnline){
+      if (!isFirstLoad && !widget.popupProps.isFilterOnline) {
         _addDataToStream(_applyFilter(filter));
         return;
       }
 
       final List<T> myItems = await widget.items!(filter, infiniteScrollProps);
 
-      if(infiniteScrollProps != null) isInfiniteScrollEnded = myItems.length < infiniteScrollProps.take;
+      if (infiniteScrollProps != null)
+        isInfiniteScrollEnded = myItems.length < infiniteScrollProps.take;
 
-      if(widget.popupProps.isFilterOnline && widget.popupProps.infiniteScrollProps?.skip == infiniteScrollProps?.skip) _cachedItems.clear();
+      if (widget.popupProps.isFilterOnline &&
+          widget.popupProps.infiniteScrollProps?.skip ==
+              infiniteScrollProps?.skip) _cachedItems.clear();
 
       //add new online items to cache list
       _cachedItems.addAll(myItems);
 
       //manage data filtering
-      if (widget.popupProps.isFilterOnline) _addDataToStream(_cachedItems);
-      else _addDataToStream(_applyFilter(filter));
+      if (widget.popupProps.isFilterOnline)
+        _addDataToStream(_cachedItems);
+      else
+        _addDataToStream(_applyFilter(filter));
     } catch (e) {
       _setErrorToStream(e);
     }
@@ -376,11 +394,16 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
   void _addDataToStream(List<T> data) {
     if (_itemsStream.isClosed) return;
-    _itemsStream.add(data);
+    final temp = data.toSet().toList();
+    // sort items if required
+    if (widget.sortFilterFn != null) {
+      temp.sort((a, b) => widget.sortFilterFn!(a, b, searchBoxController.text));
+    }
+    _itemsStream.add(temp);
 
     //update showed data list
     _currentShowedItems.clear();
-    _currentShowedItems.addAll(data);
+    _currentShowedItems.addAll(temp);
   }
 
   void _setErrorToStream(Object error, [StackTrace? stackTrace]) {
@@ -479,7 +502,8 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                   SingleActivator(LogicalKeyboardKey.space):
                       DoNothingAndStopPropagationTextIntent(),
                 },
-                child: TextField(//todo add all new fields
+                child: TextField(
+                  //todo add all new fields
                   enableIMEPersonalizedLearning: widget.popupProps
                       .searchFieldProps.enableIMEPersonalizedLearning,
                   clipBehavior: widget.popupProps.searchFieldProps.clipBehavior,
