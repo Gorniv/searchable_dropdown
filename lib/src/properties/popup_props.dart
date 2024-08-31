@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../dropdown_search.dart';
-import 'infinite_scroll_props.dart';
 
 class PopupProps<T> {
   ///popup title

@@ -165,7 +165,7 @@ class DropdownSearch<T> extends StatefulWidget {
   final BeforePopupOpeningMultiSelection<T>? onBeforePopupOpeningMultiSelection;
 
   ///For controlling the overlay color when hovering the mouse over the dropdown inkwell
-  final MaterialStateProperty<Color?>? overlayColor;
+  final WidgetStateProperty<Color?>? overlayColor;
 
   ///For controlling the border radius of the dropdown inkwell
   final BorderRadius? borderRadius;
