@@ -394,10 +394,12 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
   void _addDataToStream(List<T> data) {
     if (_itemsStream.isClosed) return;
-    final temp = data.toSet().toList();
+    var temp = data;
+    final filter = searchBoxController.text;
     // sort items if required
-    if (widget.sortFilterFn != null) {
-      temp.sort((a, b) => widget.sortFilterFn!(a, b, searchBoxController.text));
+    if (widget.sortFilterFn != null && filter.isNotEmpty) {
+      temp = temp.toSet().toList();
+      temp.sort((a, b) => widget.sortFilterFn!(a, b, filter));
     }
     _itemsStream.add(temp);
 
