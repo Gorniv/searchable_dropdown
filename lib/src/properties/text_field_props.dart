@@ -55,6 +55,7 @@ class TextFieldProps {
   final ScrollController? scrollController;
   final Iterable<String>? autofillHints;
   final String? restorationId;
+  final ValueChanged<String>? onSubmitted;
 
   const TextFieldProps({
     this.controller,
@@ -107,5 +108,6 @@ class TextFieldProps {
     this.clipBehavior = Clip.hardEdge,
     this.enableIMEPersonalizedLearning = true,
     this.focusNode,
+    this.onSubmitted,
   });
 }

@@ -582,6 +582,7 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                       widget.popupProps.searchFieldProps.autofillHints,
                   restorationId:
                       widget.popupProps.searchFieldProps.restorationId,
+                  onSubmitted: widget.popupProps.searchFieldProps.onSubmitted,
                 ),
               ),
             ),
