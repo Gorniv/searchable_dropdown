@@ -151,6 +151,7 @@ class DropdownSearch<T> extends StatefulWidget {
 
   ///custom dropdown icon button properties
   final DropdownButtonProps dropdownButtonProps;
+  final Widget? afterDropdownButtonProps;
 
   ///custom props to single mode popup
   final PopupPropsMultiSelection<T> popupProps;
@@ -167,7 +168,7 @@ class DropdownSearch<T> extends StatefulWidget {
   final BeforePopupOpeningMultiSelection<T>? onBeforePopupOpeningMultiSelection;
 
   ///For controlling the overlay color when hovering the mouse over the dropdown inkwell
-  final MaterialStateProperty<Color?>? overlayColor;
+  final WidgetStateProperty<Color?>? overlayColor;
 
   ///For controlling the border radius of the dropdown inkwell
   final BorderRadius? borderRadius;
@@ -194,6 +195,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.onBeforePopupOpening,
     this.overlayColor,
     this.borderRadius,
+    this.afterDropdownButtonProps,
     PopupProps<T> popupProps = const PopupProps.menu(),
   })  : assert(
           !popupProps.showSelectedItems || T == String || compareFn != null,
@@ -226,6 +228,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.popupProps = const PopupPropsMultiSelection.menu(),
     this.overlayColor,
     this.borderRadius,
+    this.afterDropdownButtonProps,
     FormFieldSetter<List<T>>? onSaved,
     ValueChanged<List<T>>? onChanged,
     BeforeChangeMultiSelection<T>? onBeforeChange,
@@ -544,6 +547,8 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
             tooltip: widget.dropdownButtonProps.tooltip,
             visualDensity: widget.dropdownButtonProps.visualDensity,
           ),
+        if (widget.afterDropdownButtonProps != null)
+          widget.afterDropdownButtonProps!,
       ],
     );
   }
