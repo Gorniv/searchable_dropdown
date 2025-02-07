@@ -16,6 +16,7 @@ class MenuProps {
   final bool borderOnForeground;
   final Curve? barrierCurve;
   final String? barrierLabel;
+  final double? minWidth;
   final PositionCallback? positionCallback;
 
   const MenuProps({
@@ -33,5 +34,7 @@ class MenuProps {
     this.borderOnForeground = false,
     this.borderRadius,
     this.shadowColor,
+    // width of dropdown after click
+    this.minWidth,
   });
 }

@@ -28,11 +28,12 @@ class _PopupMenuRouteLayout extends SingleChildLayoutDelegate {
   // Rectangle of underlying button, relative to the overlay's dimensions.
   final RelativeRect position;
   final BuildContext context;
-
-  _PopupMenuRouteLayout(
-    this.context,
-    this.position,
-  );
+  final MenuProps menuModeProps;
+  _PopupMenuRouteLayout({
+    required this.menuModeProps,
+    required this.context,
+    required this.position,
+  });
 
   @override
   BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
@@ -43,9 +44,14 @@ class _PopupMenuRouteLayout extends SingleChildLayoutDelegate {
     double safeAreaBottom = MediaQuery.of(context).padding.bottom;
     double totalSafeArea = safeAreaTop + safeAreaBottom;
     double maxHeight = constraints.minHeight - keyBoardHeight - totalSafeArea;
+    final width = parentRenderBox.size.width - position.right - position.left;
     return BoxConstraints.loose(
       Size(
-        parentRenderBox.size.width - position.right - position.left,
+        menuModeProps.minWidth == null
+            ? width
+            : width > menuModeProps.minWidth!
+                ? width
+                : menuModeProps.minWidth!,
         maxHeight,
       ),
     );
@@ -106,13 +112,15 @@ class _PopupMenuRoute<T> extends PopupRoute<T> {
   String? get barrierLabel => menuModeProps.barrierLabel;
 
   @override
-  Animation<double>? get animation => menuModeProps.animation ?? super.animation;
+  Animation<double>? get animation =>
+      menuModeProps.animation ?? super.animation;
 
   @override
   Curve get barrierCurve => menuModeProps.barrierCurve ?? super.barrierCurve;
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
+  Widget buildPage(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation) {
     final PopupMenuThemeData popupMenuTheme = PopupMenuTheme.of(context);
     final menu = Material(
       shape: menuModeProps.shape ?? popupMenuTheme.shape,
@@ -128,7 +136,11 @@ class _PopupMenuRoute<T> extends PopupRoute<T> {
     );
 
     return CustomSingleChildLayout(
-      delegate: _PopupMenuRouteLayout(context, position),
+      delegate: _PopupMenuRouteLayout(
+        context: context,
+        position: position,
+        menuModeProps: menuModeProps,
+      ),
       child: capturedThemes.wrap(menu),
     );
   }
