@@ -1,6 +1,7 @@
 library dropdown_search;
 
 import 'dart:async';
+import 'dart:nativewrappers/_internal/vm/lib/ffi_allocation_patch.dart';
 
 import 'package:dropdown_search/src/properties/clear_button_props.dart';
 import 'package:dropdown_search/src/properties/dropdown_button_props.dart';
@@ -172,6 +173,7 @@ class DropdownSearch<T> extends StatefulWidget {
 
   ///For controlling the border radius of the dropdown inkwell
   final BorderRadius? borderRadius;
+  final Widget Function(T? getSelectedItem)? builderSelectedItem;
 
   DropdownSearch({
     Key? key,
@@ -196,6 +198,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.overlayColor,
     this.borderRadius,
     this.afterDropdownButtonProps,
+    this.builderSelectedItem,
     PopupProps<T> popupProps = const PopupProps.menu(),
   })  : assert(
           !popupProps.showSelectedItems || T == String || compareFn != null,
@@ -229,6 +232,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.overlayColor,
     this.borderRadius,
     this.afterDropdownButtonProps,
+    this.builderSelectedItem,
     FormFieldSetter<List<T>>? onSaved,
     ValueChanged<List<T>>? onChanged,
     BeforeChangeMultiSelection<T>? onBeforeChange,
@@ -334,13 +338,14 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Flexible(
-              child: Text(
-                _selectedItemAsString(item),
-                style: Theme.of(context).textTheme.titleSmall,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            widget.builderSelectedItem?.call(item) ??
+                Flexible(
+                  child: Text(
+                    _selectedItemAsString(item),
+                    style: Theme.of(context).textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
             MaterialButton(
               height: 20,
               shape: const CircleBorder(),
@@ -377,11 +382,12 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
               .toList(),
         );
       }
-      return Text(
-        _selectedItemAsString(getSelectedItem),
-        style: widget.dropdownDecoratorProps.baseStyle,
-        textAlign: widget.dropdownDecoratorProps.textAlign,
-      );
+      return widget.builderSelectedItem?.call(getSelectedItem) ??
+          Text(
+            _selectedItemAsString(getSelectedItem),
+            style: widget.dropdownDecoratorProps.baseStyle,
+            textAlign: widget.dropdownDecoratorProps.textAlign,
+          );
     }
 
     return selectedItemWidget();
