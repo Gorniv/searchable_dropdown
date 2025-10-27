@@ -122,13 +122,25 @@ class _PopupMenuRoute<T> extends PopupRoute<T> {
   Widget buildPage(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation) {
     final PopupMenuThemeData popupMenuTheme = PopupMenuTheme.of(context);
+
+    // Determine shape and borderRadius to avoid Material assert
+    ShapeBorder? finalShape = menuModeProps.shape ?? popupMenuTheme.shape;
+    BorderRadiusGeometry? finalBorderRadius = menuModeProps.borderRadius;
+
+    // If both shape and borderRadius are set, prioritize shape and log warning
+    if (finalShape != null && finalBorderRadius != null) {
+      debugPrint(
+          'DropdownSearch: Both shape and borderRadius are set. Using shape, ignoring borderRadius.');
+      finalBorderRadius = null;
+    }
+
     final menu = Material(
-      shape: menuModeProps.shape ?? popupMenuTheme.shape,
+      shape: finalShape,
       color: menuModeProps.backgroundColor ?? popupMenuTheme.color,
       type: MaterialType.card,
       elevation: menuModeProps.elevation ?? popupMenuTheme.elevation ?? 8.0,
       clipBehavior: menuModeProps.clipBehavior,
-      borderRadius: menuModeProps.borderRadius,
+      borderRadius: finalBorderRadius,
       animationDuration: menuModeProps.animationDuration,
       shadowColor: menuModeProps.shadowColor,
       borderOnForeground: menuModeProps.borderOnForeground,
