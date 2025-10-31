@@ -127,10 +127,14 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(maxHeight: 350),
     this.interceptCallBacks = false,
+    ModalBottomSheetProps? modalBottomSheetProps,
+    BottomSheetProps? bottomSheetProps,
+    DialogProps? dialogProps,
   })  : this.mode = Mode.MENU,
-        this.bottomSheetProps = const BottomSheetProps(),
-        this.dialogProps = const DialogProps(),
-        this.modalBottomSheetProps = const ModalBottomSheetProps();
+        this.bottomSheetProps = bottomSheetProps ?? const BottomSheetProps(),
+        this.dialogProps = dialogProps ?? const DialogProps(),
+        this.modalBottomSheetProps =
+            modalBottomSheetProps ?? const ModalBottomSheetProps();
 
   const PopupProps.dialog({
     this.fit = FlexFit.tight,
@@ -183,10 +187,14 @@ class PopupProps<T> {
     this.containerBuilder,
     this.constraints = const BoxConstraints(maxHeight: 500),
     this.interceptCallBacks = false,
+    MenuProps? menuProps,
+    DialogProps? dialogProps,
+    ModalBottomSheetProps? modalBottomSheetProps,
   })  : this.mode = Mode.BOTTOM_SHEET,
-        this.menuProps = const MenuProps(),
-        this.dialogProps = const DialogProps(),
-        this.modalBottomSheetProps = const ModalBottomSheetProps();
+        this.menuProps = menuProps ?? const MenuProps(),
+        this.dialogProps = dialogProps ?? const DialogProps(),
+        this.modalBottomSheetProps =
+            modalBottomSheetProps ?? const ModalBottomSheetProps();
 
   const PopupProps.modalBottomSheet({
     this.title,
