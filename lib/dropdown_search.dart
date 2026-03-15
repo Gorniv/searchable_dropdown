@@ -6,6 +6,7 @@ import 'package:dropdown_search/src/properties/clear_button_props.dart';
 import 'package:dropdown_search/src/properties/dropdown_button_props.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'src/properties/dropdown_decorator_props.dart';
 import 'src/properties/popup_props.dart';
@@ -80,6 +81,27 @@ typedef List<T> FavoriteItems<T>(List<T> items);
 
 enum Mode { DIALOG, MODAL_BOTTOM_SHEET, MENU, BOTTOM_SHEET }
 
+class DropdownSearchController<T> extends ValueNotifier<List<T>> {
+  DropdownSearchController([List<T> selectedItems = const []])
+      : super(List<T>.from(selectedItems));
+
+  T? get selectedItem => value.isEmpty ? null : value.first;
+
+  List<T> get selectedItems => List<T>.unmodifiable(value);
+
+  void changeSelectedItem(T? selectedItem) {
+    value = selectedItem == null ? [] : [selectedItem];
+  }
+
+  void changeSelectedItems(List<T> selectedItems) {
+    value = List<T>.from(selectedItems);
+  }
+
+  void clear() {
+    value = [];
+  }
+}
+
 class DropdownSearch<T> extends StatefulWidget {
   ///offline items list
   final List<T> items;
@@ -89,6 +111,9 @@ class DropdownSearch<T> extends StatefulWidget {
 
   ///selected items
   final List<T> selectedItems;
+
+  ///controller used to update the selected item(s) externally
+  final DropdownSearchController<T>? controller;
 
   ///function that returns item from API
   final DropdownSearchOnFind<T>? asyncItems;
@@ -182,6 +207,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.onChanged,
     this.items = const [],
     this.selectedItem,
+    this.controller,
     this.asyncItems,
     this.dropdownBuilder,
     this.dropdownDecoratorProps = const DropDownDecoratorProps(),
@@ -202,6 +228,7 @@ class DropdownSearch<T> extends StatefulWidget {
   })  : assert(
           !popupProps.showSelectedItems || T == String || compareFn != null,
         ),
+        assert(controller == null || selectedItem == null),
         this.popupProps = PopupPropsMultiSelection.from(popupProps),
         this.isMultiSelectionMode = false,
         this.dropdownBuilderMultiSelection = null,
@@ -226,6 +253,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.sortFilterFn,
     this.itemAsString,
     this.compareFn,
+    this.controller,
     this.selectedItems = const [],
     this.popupProps = const PopupPropsMultiSelection.menu(),
     this.overlayColor,
@@ -241,6 +269,7 @@ class DropdownSearch<T> extends StatefulWidget {
   })  : assert(
           !popupProps.showSelectedItems || T == String || compareFn != null,
         ),
+        assert(controller == null || selectedItems.isEmpty),
         this.onChangedMultiSelection = onChanged,
         this.onBeforePopupOpeningMultiSelection = onBeforePopupOpening,
         this.onSavedMultiSelection = onSaved,
@@ -265,27 +294,42 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   final ValueNotifier<List<T>> _selectedItemsNotifier = ValueNotifier([]);
   final ValueNotifier<bool> _isFocused = ValueNotifier(false);
   final _popupStateKey = GlobalKey<SelectionWidgetState<T>>();
+  VoidCallback? _controllerListener;
 
   @override
   void initState() {
     super.initState();
-    _selectedItemsNotifier.value = isMultiSelectionMode
-        ? List.from(widget.selectedItems)
-        : _itemToList(widget.selectedItem);
+    _selectedItemsNotifier.value = _externalSelectedItems;
+    _registerControllerListener(widget.controller);
   }
 
   @override
   void didUpdateWidget(DropdownSearch<T> oldWidget) {
-    List<T> oldSelectedItems = isMultiSelectionMode
-        ? oldWidget.selectedItems
-        : _itemToList(oldWidget.selectedItem);
+    if (oldWidget.controller != widget.controller) {
+      _removeControllerListener(oldWidget.controller);
+      _registerControllerListener(widget.controller);
+    }
 
-    List<T> newSelectedItems = isMultiSelectionMode
-        ? widget.selectedItems
-        : _itemToList(widget.selectedItem);
+    if (widget.controller != null) {
+      _applySelectedItemsSafely(
+        widget.controller!.selectedItems,
+        triggerOnChanged: false,
+        updateController: false,
+        forceRefresh: true,
+      );
+    } else {
+      final oldSelectedItems = oldWidget.isMultiSelectionMode
+          ? oldWidget.selectedItems
+          : _itemToList(oldWidget.selectedItem);
+      final newSelectedItems = _externalSelectedItems;
 
-    if (!listEquals(oldSelectedItems, newSelectedItems)) {
-      _selectedItemsNotifier.value = List.from(newSelectedItems);
+      if (!listEquals(oldSelectedItems, newSelectedItems)) {
+        _applySelectedItemsSafely(
+          newSelectedItems,
+          triggerOnChanged: false,
+          updateController: false,
+        );
+      }
     }
 
     ///this code check if we need to refresh the popup widget to update
@@ -302,7 +346,7 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<List<T?>>(
+    return ValueListenableBuilder<List<T>>(
       valueListenable: _selectedItemsNotifier,
       builder: (context, data, wt) {
         return IgnorePointer(
@@ -321,6 +365,118 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   List<T> _itemToList(T? item) {
     List<T?> nullableList = List.filled(1, item);
     return nullableList.whereType<T>().toList();
+  }
+
+  List<T> get _externalSelectedItems =>
+      widget.controller?.selectedItems ??
+      (isMultiSelectionMode
+          ? List<T>.from(widget.selectedItems)
+          : _itemToList(widget.selectedItem));
+
+  List<T> _normalizeSelectedItems(List<T> selectedItems) {
+    final normalizedSelectedItems = List<T>.from(selectedItems);
+
+    if (!isMultiSelectionMode && normalizedSelectedItems.length > 1) {
+      return [normalizedSelectedItems.first];
+    }
+
+    return normalizedSelectedItems;
+  }
+
+  void _registerControllerListener(DropdownSearchController<T>? controller) {
+    if (controller == null) {
+      return;
+    }
+
+    _controllerListener = () {
+      _applySelectedItemsSafely(
+        controller.selectedItems,
+        triggerOnChanged: false,
+        updateController: false,
+        forceRefresh: true,
+      );
+    };
+    controller.addListener(_controllerListener!);
+  }
+
+  bool get _shouldDeferUiUpdate =>
+      WidgetsBinding.instance.schedulerPhase ==
+      SchedulerPhase.persistentCallbacks;
+
+  void _applySelectedItemsSafely(
+    List<T> selectedItems, {
+    required bool triggerOnChanged,
+    required bool updateController,
+    bool forceRefresh = false,
+  }) {
+    if (_shouldDeferUiUpdate) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        _applySelectedItems(
+          selectedItems,
+          triggerOnChanged: triggerOnChanged,
+          updateController: updateController,
+          forceRefresh: forceRefresh,
+        );
+      });
+      return;
+    }
+
+    _applySelectedItems(
+      selectedItems,
+      triggerOnChanged: triggerOnChanged,
+      updateController: updateController,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  void _removeControllerListener(DropdownSearchController<T>? controller) {
+    if (controller != null && _controllerListener != null) {
+      controller.removeListener(_controllerListener!);
+    }
+    _controllerListener = null;
+  }
+
+  void _applySelectedItems(
+    List<T> selectedItems, {
+    required bool triggerOnChanged,
+    required bool updateController,
+    bool forceRefresh = false,
+  }) {
+    final normalizedSelectedItems = _normalizeSelectedItems(selectedItems);
+
+    if (!forceRefresh &&
+        listEquals(_selectedItemsNotifier.value, normalizedSelectedItems)) {
+      return;
+    }
+
+    _selectedItemsNotifier.value = normalizedSelectedItems;
+    _popupStateKey.currentState?.setSelectedItems(normalizedSelectedItems);
+
+    final shouldNormalizeSingleSelectionController = widget.controller !=
+            null &&
+        !isMultiSelectionMode &&
+        selectedItems.length > 1 &&
+        !listEquals(widget.controller!.selectedItems, normalizedSelectedItems);
+
+    if (updateController || shouldNormalizeSingleSelectionController) {
+      widget.controller?.changeSelectedItems(normalizedSelectedItems);
+    }
+
+    if (!triggerOnChanged) {
+      return;
+    }
+
+    if (widget.onChanged != null) {
+      widget.onChanged!(
+        normalizedSelectedItems.isEmpty ? null : normalizedSelectedItems.first,
+      );
+    } else if (widget.onChangedMultiSelection != null) {
+      widget.onChangedMultiSelection!(normalizedSelectedItems);
+    }
   }
 
   Widget _defaultSelectedItemWidget() {
@@ -702,11 +858,11 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   ///handle on change value , if the validation is active , we validate the new selected item
   void _handleOnChangeSelectedItems(List<T> selectedItems) {
     final changeItem = () {
-      _selectedItemsNotifier.value = List.from(selectedItems);
-      if (widget.onChanged != null)
-        widget.onChanged!(getSelectedItem);
-      else if (widget.onChangedMultiSelection != null)
-        widget.onChangedMultiSelection!(selectedItems);
+      _applySelectedItems(
+        selectedItems,
+        triggerOnChanged: true,
+        updateController: true,
+      );
     };
 
     if (widget.onBeforeChange != null) {
@@ -737,6 +893,12 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       return widget.compareFn!(i1, i2);
     else
       return i1 == i2;
+  }
+
+  @override
+  void dispose() {
+    _removeControllerListener(widget.controller);
+    super.dispose();
   }
 
   ///Function that return then UI based on searchMode
@@ -854,5 +1016,17 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
   List<T> get popupGetSelectedItems =>
       _popupStateKey.currentState?.getSelectedItem ?? [];
 
-  void updatePopupState() => _popupStateKey.currentState?.setState(() {});
+  void updatePopupState() {
+    if (_shouldDeferUiUpdate) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _popupStateKey.currentState?.setState(() {});
+      });
+      return;
+    }
+
+    _popupStateKey.currentState?.setState(() {});
+  }
 }

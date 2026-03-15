@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../../dropdown_search.dart';
@@ -78,10 +79,30 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
   @override
   void didUpdateWidget(covariant SelectionWidget<T> oldWidget) {
     if (!listEquals(
-        oldWidget.defaultSelectedItems, widget.defaultSelectedItems)) {
-      _selectedItemsNotifier.value = widget.defaultSelectedItems;
+      oldWidget.defaultSelectedItems,
+      widget.defaultSelectedItems,
+    )) {
+      _setSelectedItemsSafely(widget.defaultSelectedItems);
     }
     super.didUpdateWidget(oldWidget);
+  }
+
+  bool get _shouldDeferUiUpdate =>
+      WidgetsBinding.instance.schedulerPhase ==
+      SchedulerPhase.persistentCallbacks;
+
+  void _setSelectedItemsSafely(List<T> selectedItems) {
+    if (_shouldDeferUiUpdate) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _selectedItemsNotifier.value = List<T>.from(selectedItems);
+      });
+      return;
+    }
+
+    _selectedItemsNotifier.value = List<T>.from(selectedItems);
   }
 
   @override
@@ -735,6 +756,10 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
   void deselectAllItems() {
     deselectItems(_cachedItems);
+  }
+
+  void setSelectedItems(List<T> selectedItems) {
+    _setSelectedItemsSafely(selectedItems);
   }
 
   bool get isAllItemSelected =>
