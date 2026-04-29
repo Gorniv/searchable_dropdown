@@ -62,10 +62,11 @@ typedef Widget FavoriteItemsBuilder<T>(
   T item,
   bool isSelected,
 );
-typedef Widget ValidationMultiSelectionBuilder<T>(
+typedef Widget ValidationBuilder<T>(
   BuildContext context,
-  List<T> item,
+  List<T> selectedItems,
 );
+typedef ValidationMultiSelectionBuilder<T> = ValidationBuilder<T>;
 
 typedef RelativeRect PositionCallback(
   RenderBox popupButtonObject,

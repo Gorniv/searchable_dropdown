@@ -73,6 +73,9 @@ class PopupProps<T> {
   ///the popup widget is considered as a child
   final PopupBuilder? containerBuilder;
 
+  ///widget used to add a validation/action area below the popup list
+  final ValidationBuilder<T>? validationWidgetBuilder;
+
   ///popup constraints
   final BoxConstraints constraints;
 
@@ -102,6 +105,7 @@ class PopupProps<T> {
     this.disabledItemFn,
     this.isFilterOnline = false,
     this.containerBuilder,
+    this.validationWidgetBuilder,
     this.constraints = const BoxConstraints(),
     this.interceptCallBacks = false,
   });
@@ -125,6 +129,7 @@ class PopupProps<T> {
     this.disabledItemFn,
     this.isFilterOnline = false,
     this.containerBuilder,
+    this.validationWidgetBuilder,
     this.constraints = const BoxConstraints(maxHeight: 350),
     this.interceptCallBacks = false,
     ModalBottomSheetProps? modalBottomSheetProps,
@@ -155,6 +160,7 @@ class PopupProps<T> {
     this.disabledItemFn,
     this.isFilterOnline = false,
     this.containerBuilder,
+    this.validationWidgetBuilder,
     this.constraints = const BoxConstraints(
       minWidth: 500,
       maxWidth: 500,
@@ -185,6 +191,7 @@ class PopupProps<T> {
     this.disabledItemFn,
     this.isFilterOnline = false,
     this.containerBuilder,
+    this.validationWidgetBuilder,
     this.constraints = const BoxConstraints(maxHeight: 500),
     this.interceptCallBacks = false,
     MenuProps? menuProps,
@@ -215,6 +222,7 @@ class PopupProps<T> {
     this.disabledItemFn,
     this.isFilterOnline = false,
     this.containerBuilder,
+    this.validationWidgetBuilder,
     this.constraints = const BoxConstraints(maxHeight: 500),
     this.interceptCallBacks = false,
   })  : this.mode = Mode.MODAL_BOTTOM_SHEET,
@@ -232,9 +240,6 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
 
   ///widget used to show checked items in multiSelection mode
   final DropdownSearchPopupItemBuilder<T>? selectionWidget;
-
-  ///widget used to validate items in multiSelection mode
-  final ValidationMultiSelectionBuilder<T>? validationWidgetBuilder;
 
   final TextDirection textDirection;
 
@@ -261,12 +266,12 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.dialogProps = const DialogProps(),
     super.menuProps = const MenuProps(),
     super.containerBuilder,
+    super.validationWidgetBuilder,
     super.constraints = const BoxConstraints(maxHeight: 350),
     super.interceptCallBacks = false,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
-    this.validationWidgetBuilder,
     this.textDirection = TextDirection.ltr,
   }) : super._();
 
@@ -289,12 +294,12 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.disabledItemFn,
     super.isFilterOnline = false,
     super.containerBuilder,
+    super.validationWidgetBuilder,
     super.constraints = const BoxConstraints(maxHeight: 350),
     super.interceptCallBacks = false,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
-    this.validationWidgetBuilder,
     this.textDirection = TextDirection.ltr,
   }) : super.menu();
 
@@ -317,6 +322,7 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.disabledItemFn,
     super.isFilterOnline = false,
     super.containerBuilder,
+    super.validationWidgetBuilder,
     super.constraints = const BoxConstraints(
       minWidth: 500,
       maxWidth: 500,
@@ -326,7 +332,6 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
-    this.validationWidgetBuilder,
     this.textDirection = TextDirection.ltr,
   }) : super.dialog();
 
@@ -349,12 +354,12 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.disabledItemFn,
     super.isFilterOnline = false,
     super.containerBuilder,
+    super.validationWidgetBuilder,
     super.constraints = const BoxConstraints(maxHeight: 500),
     super.interceptCallBacks = false,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
-    this.validationWidgetBuilder,
     this.textDirection = TextDirection.ltr,
   }) : super.bottomSheet();
 
@@ -377,12 +382,12 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.loadingBuilder,
     super.showSelectedItems,
     super.containerBuilder,
+    super.validationWidgetBuilder,
     super.constraints = const BoxConstraints(maxHeight: 500),
     super.interceptCallBacks = false,
     this.onItemAdded,
     this.onItemRemoved,
     this.selectionWidget,
-    this.validationWidgetBuilder,
     this.textDirection = TextDirection.ltr,
   }) : super.modalBottomSheet();
 
@@ -410,12 +415,12 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
           dialogProps: popupProps.dialogProps,
           menuProps: popupProps.menuProps,
           containerBuilder: popupProps.containerBuilder,
+          validationWidgetBuilder: popupProps.validationWidgetBuilder,
           constraints: popupProps.constraints,
           interceptCallBacks: popupProps.interceptCallBacks,
           onItemAdded: null,
           onItemRemoved: null,
           selectionWidget: null,
-          validationWidgetBuilder: null,
           textDirection: TextDirection.ltr,
         );
 }

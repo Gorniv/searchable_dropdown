@@ -243,7 +243,7 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                   ],
                 ),
               ),
-              _multiSelectionValidation(),
+              _validationWidget(),
             ],
           );
         });
@@ -258,7 +258,12 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
   ///close popup
   void closePopup() => Navigator.pop(context);
 
-  Widget _multiSelectionValidation() {
+  Widget _validationWidget() {
+    if (widget.popupProps.validationWidgetBuilder != null) {
+      return widget.popupProps.validationWidgetBuilder!(
+          context, _selectedItems);
+    }
+
     if (!widget.isMultiSelectionMode) return SizedBox.shrink();
 
     Widget defaultValidation = Padding(
@@ -271,11 +276,6 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
         ),
       ),
     );
-
-    if (widget.popupProps.validationWidgetBuilder != null) {
-      return widget.popupProps.validationWidgetBuilder!(
-          context, _selectedItems);
-    }
 
     return defaultValidation;
   }
