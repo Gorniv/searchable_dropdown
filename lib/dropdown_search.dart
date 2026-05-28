@@ -67,6 +67,10 @@ typedef Widget ValidationBuilder<T>(
   List<T> selectedItems,
 );
 typedef ValidationMultiSelectionBuilder<T> = ValidationBuilder<T>;
+typedef ScrollToSelectedItemBuilder = Widget Function(
+  BuildContext context,
+  VoidCallback? onPressed,
+);
 
 typedef RelativeRect PositionCallback(
   RenderBox popupButtonObject,
@@ -112,6 +116,12 @@ class DropdownSearch<T> extends StatefulWidget {
 
   ///selected items
   final List<T> selectedItems;
+
+  ///item used to initialize popup selection/highlight separately from [selectedItem]
+  final T? popupSelectedItem;
+
+  ///items used to initialize popup selection/highlight separately from [selectedItems]
+  final List<T> popupSelectedItems;
 
   ///controller used to update the selected item(s) externally
   final DropdownSearchController<T>? controller;
@@ -209,6 +219,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.items = const [],
     this.selectedItem,
     this.controller,
+    this.popupSelectedItem,
     this.asyncItems,
     this.dropdownBuilder,
     this.dropdownDecoratorProps = const DropDownDecoratorProps(),
@@ -236,6 +247,7 @@ class DropdownSearch<T> extends StatefulWidget {
         this.validatorMultiSelection = null,
         this.onBeforeChangeMultiSelection = null,
         this.selectedItems = const [],
+        this.popupSelectedItems = const [],
         this.onSavedMultiSelection = null,
         this.onChangedMultiSelection = null,
         this.onBeforePopupOpeningMultiSelection = null,
@@ -256,6 +268,7 @@ class DropdownSearch<T> extends StatefulWidget {
     this.compareFn,
     this.controller,
     this.selectedItems = const [],
+    this.popupSelectedItems = const [],
     this.popupProps = const PopupPropsMultiSelection.menu(),
     this.overlayColor,
     this.borderRadius,
@@ -281,6 +294,7 @@ class DropdownSearch<T> extends StatefulWidget {
         this.dropdownBuilder = null,
         this.validator = null,
         this.onBeforeChange = null,
+        this.popupSelectedItem = null,
         this.selectedItem = null,
         this.onSaved = null,
         this.onChanged = null,
@@ -333,6 +347,13 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       }
     }
 
+    if (oldWidget.popupSelectedItem != widget.popupSelectedItem ||
+        !listEquals(oldWidget.popupSelectedItems, widget.popupSelectedItems)) {
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        _popupStateKey.currentState?.setSelectedItems(_popupSelectedItems);
+      });
+    }
+
     ///this code check if we need to refresh the popup widget to update
     ///containerBuilder widget
     if (widget.popupProps.containerBuilder !=
@@ -373,6 +394,19 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       (isMultiSelectionMode
           ? List<T>.from(widget.selectedItems)
           : _itemToList(widget.selectedItem));
+
+  List<T> get _popupSelectedItems {
+    if (isMultiSelectionMode) {
+      return widget.popupSelectedItems.isEmpty
+          ? getSelectedItems
+          : List<T>.from(widget.popupSelectedItems);
+    }
+
+    final T? popupSelectedItem = widget.popupSelectedItem;
+    return popupSelectedItem == null
+        ? getSelectedItems
+        : <T>[popupSelectedItem];
+  }
 
   List<T> _normalizeSelectedItems(List<T> selectedItems) {
     final normalizedSelectedItems = List<T>.from(selectedItems);
@@ -455,7 +489,7 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
     }
 
     _selectedItemsNotifier.value = normalizedSelectedItems;
-    _popupStateKey.currentState?.setSelectedItems(normalizedSelectedItems);
+    _popupStateKey.currentState?.setSelectedItems(_popupSelectedItems);
 
     final shouldNormalizeSingleSelectionController = widget.controller !=
             null &&
@@ -842,7 +876,7 @@ class DropdownSearchState<T> extends State<DropdownSearch<T>> {
       onChanged: _handleOnChangeSelectedItems,
       compareFn: widget.compareFn,
       isMultiSelectionMode: isMultiSelectionMode,
-      defaultSelectedItems: List.from(getSelectedItems),
+      defaultSelectedItems: List.from(_popupSelectedItems),
     );
   }
 

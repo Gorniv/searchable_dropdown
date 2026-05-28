@@ -17,6 +17,12 @@ class PopupProps<T> {
   /// props for selection list view
   final ListViewProps listViewProps;
 
+  ///scroll selected item into view when popup opens
+  final bool scrollToSelectedItem;
+
+  ///custom button used to scroll selected item into view on demand
+  final ScrollToSelectedItemBuilder? scrollToSelectedItemBuilder;
+
   /// scrollbar properties
   final ScrollbarProps scrollbarProps;
 
@@ -95,6 +101,8 @@ class PopupProps<T> {
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
     this.favoriteItemProps = const FavoriteItemProps(),
+    this.scrollToSelectedItem = false,
+    this.scrollToSelectedItemBuilder,
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -119,6 +127,8 @@ class PopupProps<T> {
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
     this.favoriteItemProps = const FavoriteItemProps(),
+    this.scrollToSelectedItem = false,
+    this.scrollToSelectedItemBuilder,
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -150,6 +160,8 @@ class PopupProps<T> {
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
     this.favoriteItemProps = const FavoriteItemProps(),
+    this.scrollToSelectedItem = false,
+    this.scrollToSelectedItemBuilder,
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -182,6 +194,8 @@ class PopupProps<T> {
     this.listViewProps = const ListViewProps(),
     this.favoriteItemProps = const FavoriteItemProps(),
     this.searchDelay = const Duration(seconds: 1),
+    this.scrollToSelectedItem = false,
+    this.scrollToSelectedItemBuilder,
     this.onDismissed,
     this.emptyBuilder,
     this.itemBuilder,
@@ -212,6 +226,8 @@ class PopupProps<T> {
     this.scrollbarProps = const ScrollbarProps(),
     this.listViewProps = const ListViewProps(),
     this.favoriteItemProps = const FavoriteItemProps(),
+    this.scrollToSelectedItem = false,
+    this.scrollToSelectedItemBuilder,
     this.searchDelay = const Duration(seconds: 1),
     this.onDismissed,
     this.emptyBuilder,
@@ -257,6 +273,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
     super.searchDelay,
+    super.scrollToSelectedItem = false,
+    super.scrollToSelectedItemBuilder,
     super.onDismissed,
     super.emptyBuilder,
     super.errorBuilder,
@@ -285,6 +303,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
     super.searchDelay,
+    super.scrollToSelectedItem = false,
+    super.scrollToSelectedItemBuilder,
     super.onDismissed,
     super.emptyBuilder,
     super.itemBuilder,
@@ -312,6 +332,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.listViewProps = const ListViewProps(),
     super.favoriteItemProps = const FavoriteItemProps(),
     super.dialogProps = const DialogProps(),
+    super.scrollToSelectedItem = false,
+    super.scrollToSelectedItemBuilder,
     super.searchDelay,
     super.onDismissed,
     super.emptyBuilder,
@@ -345,6 +367,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.bottomSheetProps = const BottomSheetProps(),
     super.scrollbarProps = const ScrollbarProps(),
     super.searchDelay,
+    super.scrollToSelectedItem = false,
+    super.scrollToSelectedItemBuilder,
     super.onDismissed,
     super.emptyBuilder,
     super.itemBuilder,
@@ -376,6 +400,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
     super.scrollbarProps = const ScrollbarProps(),
     super.listViewProps = const ListViewProps(),
     super.searchDelay,
+    super.scrollToSelectedItem = false,
+    super.scrollToSelectedItemBuilder,
     super.onDismissed,
     super.emptyBuilder,
     super.errorBuilder,
@@ -408,6 +434,8 @@ class PopupPropsMultiSelection<T> extends PopupProps<T> {
           scrollbarProps: popupProps.scrollbarProps,
           searchDelay: popupProps.searchDelay,
           searchFieldProps: popupProps.searchFieldProps,
+          scrollToSelectedItem: popupProps.scrollToSelectedItem,
+          scrollToSelectedItemBuilder: popupProps.scrollToSelectedItemBuilder,
           showSearchBox: popupProps.showSearchBox,
           showSelectedItems: popupProps.showSelectedItems,
           mode: popupProps.mode,

@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
 
 import '../../dropdown_search.dart';
 import 'checkbox_widget.dart';
@@ -44,12 +46,39 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
   final ValueNotifier<bool> _loadingNotifier = ValueNotifier(false);
   final List<T> _cachedItems = [];
   final ValueNotifier<List<T>> _selectedItemsNotifier = ValueNotifier([]);
-  final ScrollController scrollController = ScrollController();
+  final ValueNotifier<bool> _canScrollToSelectedItemNotifier =
+      ValueNotifier(false);
+  late final AutoScrollController scrollController;
   final List<T> _currentShowedItems = [];
   late TextEditingController searchBoxController;
+  int? _selectedItemIndex;
+  int _scrollToSelectedAttempts = 0;
+  bool _scrollToSelectedScheduled = false;
 
   List<T> get _selectedItems => _selectedItemsNotifier.value;
   Timer? _debounce;
+
+  bool get _scrollToSelectedItem => widget.popupProps.scrollToSelectedItem;
+
+  AutoScrollController get _autoScrollController {
+    final ScrollController? controller =
+        widget.popupProps.listViewProps.controller;
+    if (controller is AutoScrollController) {
+      return controller;
+    }
+
+    return scrollController;
+  }
+
+  ScrollController get _effectiveScrollController {
+    final ScrollController? controller =
+        widget.popupProps.listViewProps.controller;
+    if (_scrollToSelectedItem && controller is! AutoScrollController) {
+      return scrollController;
+    }
+
+    return controller ?? scrollController;
+  }
 
   void searchBoxControllerListener() {
     if (_debounce?.isActive ?? false) _debounce?.cancel();
@@ -61,6 +90,9 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
   @override
   void initState() {
     super.initState();
+    scrollController = AutoScrollController(
+      axis: widget.popupProps.listViewProps.scrollDirection,
+    );
     _selectedItemsNotifier.value = widget.defaultSelectedItems;
 
     searchBoxController = widget.popupProps.searchFieldProps.controller ??
@@ -92,22 +124,28 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
       SchedulerPhase.persistentCallbacks;
 
   void _setSelectedItemsSafely(List<T> selectedItems) {
+    void setSelectedItems() {
+      _selectedItemsNotifier.value = List<T>.from(selectedItems);
+      _refreshSelectedScrollTarget(_currentShowedItems);
+    }
+
     if (_shouldDeferUiUpdate) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
         }
-        _selectedItemsNotifier.value = List<T>.from(selectedItems);
+        setSelectedItems();
       });
       return;
     }
 
-    _selectedItemsNotifier.value = List<T>.from(selectedItems);
+    setSelectedItems();
   }
 
   @override
   void dispose() {
     _itemsStream.close();
+    _canScrollToSelectedItemNotifier.dispose();
     _debounce?.cancel();
 
     if (widget.popupProps.searchFieldProps.controller == null) {
@@ -116,9 +154,7 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
       searchBoxController.removeListener(searchBoxControllerListener);
     }
 
-    if (widget.popupProps.listViewProps.controller == null) {
-      scrollController.dispose();
-    }
+    scrollController.dispose();
     super.dispose();
   }
 
@@ -158,9 +194,7 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                         }
 
                         return RawScrollbar(
-                          controller:
-                              widget.popupProps.listViewProps.controller ??
-                                  scrollController,
+                          controller: _effectiveScrollController,
                           thumbVisibility:
                               widget.popupProps.scrollbarProps.thumbVisibility,
                           trackVisibility:
@@ -196,46 +230,7 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                               widget.popupProps.scrollbarProps.trackColor,
                           trackRadius:
                               widget.popupProps.scrollbarProps.trackRadius,
-                          child: ListView.builder(
-                            controller:
-                                widget.popupProps.listViewProps.controller ??
-                                    scrollController,
-                            shrinkWrap:
-                                widget.popupProps.listViewProps.shrinkWrap,
-                            padding: widget.popupProps.listViewProps.padding,
-                            scrollDirection:
-                                widget.popupProps.listViewProps.scrollDirection,
-                            reverse: widget.popupProps.listViewProps.reverse,
-                            primary: widget.popupProps.listViewProps.primary,
-                            physics: widget.popupProps.listViewProps.physics,
-                            itemExtent:
-                                widget.popupProps.listViewProps.itemExtent,
-                            addAutomaticKeepAlives: widget.popupProps
-                                .listViewProps.addAutomaticKeepAlives,
-                            addRepaintBoundaries: widget
-                                .popupProps.listViewProps.addRepaintBoundaries,
-                            addSemanticIndexes: widget
-                                .popupProps.listViewProps.addSemanticIndexes,
-                            cacheExtent:
-                                widget.popupProps.listViewProps.cacheExtent,
-                            semanticChildCount: widget
-                                .popupProps.listViewProps.semanticChildCount,
-                            dragStartBehavior: widget
-                                .popupProps.listViewProps.dragStartBehavior,
-                            keyboardDismissBehavior: widget.popupProps
-                                .listViewProps.keyboardDismissBehavior,
-                            restorationId:
-                                widget.popupProps.listViewProps.restorationId,
-                            clipBehavior:
-                                widget.popupProps.listViewProps.clipBehavior,
-                            itemCount: snapshot.data!.length,
-                            itemBuilder: (context, index) {
-                              var item = snapshot.data![index];
-                              return widget.isMultiSelectionMode
-                                  ? _itemWidgetMultiSelection(item)
-                                  : _itemWidgetSingleSelection(item);
-                            },
-                          ),
+                          child: _listView(snapshot.data!),
                         );
                       },
                     ),
@@ -352,6 +347,51 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
         });
   }
 
+  Widget _listView(List<T> items) {
+    final props = widget.popupProps.listViewProps;
+
+    return ListView.builder(
+      controller: _effectiveScrollController,
+      shrinkWrap: props.shrinkWrap,
+      padding: props.padding,
+      scrollDirection: props.scrollDirection,
+      reverse: props.reverse,
+      primary: props.primary,
+      physics: props.physics,
+      itemExtent: props.itemExtent,
+      addAutomaticKeepAlives: props.addAutomaticKeepAlives,
+      addRepaintBoundaries: props.addRepaintBoundaries,
+      addSemanticIndexes: props.addSemanticIndexes,
+      scrollCacheExtent: props.cacheExtent == null
+          ? null
+          : ScrollCacheExtent.pixels(props.cacheExtent!),
+      semanticChildCount: props.semanticChildCount,
+      dragStartBehavior: props.dragStartBehavior,
+      keyboardDismissBehavior: props.keyboardDismissBehavior,
+      restorationId: props.restorationId,
+      clipBehavior: props.clipBehavior,
+      itemCount: items.length,
+      itemBuilder: (context, index) => _popupItem(items[index], index),
+    );
+  }
+
+  Widget _popupItem(T item, int index) {
+    final child = widget.isMultiSelectionMode
+        ? _itemWidgetMultiSelection(item)
+        : _itemWidgetSingleSelection(item);
+
+    if (_scrollToSelectedItem) {
+      return AutoScrollTag(
+        key: ValueKey<int>(index),
+        controller: _autoScrollController,
+        index: index,
+        child: child,
+      );
+    }
+
+    return child;
+  }
+
   ///Function that filter item (online and offline) base on user filter
   ///[filter] is the filter keyword
   ///[isFirstLoad] true if it's the first time we load data from online, false other wises
@@ -400,37 +440,111 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
 
         //don't filter data , they are already filtered online and local data are already filtered
         if (widget.popupProps.isFilterOnline == true)
-          _addDataToStream(_cachedItems);
+          _addDataToStream(_cachedItems, scrollToSelected: isFirstLoad);
         else
-          _addDataToStream(applyFilter(filter));
+          _addDataToStream(applyFilter(filter), scrollToSelected: isFirstLoad);
       } catch (e) {
         _addErrorToStream(e);
         //if offline items count > 0 , the error will be not visible for the user
         //As solution we show it in dialog
         if (widget.items.isNotEmpty) {
           _showErrorDialog(e);
-          _addDataToStream(applyFilter(filter));
+          _addDataToStream(applyFilter(filter), scrollToSelected: isFirstLoad);
         }
       }
     } else {
-      _addDataToStream(applyFilter(filter));
+      _addDataToStream(applyFilter(filter), scrollToSelected: isFirstLoad);
     }
 
     _loadingNotifier.value = false;
   }
 
-  void _addDataToStream(List<T> data) {
+  void _addDataToStream(List<T> data, {bool scrollToSelected = false}) {
     if (_itemsStream.isClosed) return;
     final temp = data;
+
     // sort items if required
     if (widget.sortFilterFn != null && searchBoxController.text.isNotEmpty) {
       temp.sort((a, b) => widget.sortFilterFn!(a, b, searchBoxController.text));
     }
-    _itemsStream.add(temp);
 
     //update showed data list
     _currentShowedItems.clear();
     _currentShowedItems.addAll(temp);
+    _refreshSelectedScrollTarget(temp, scrollToSelected: scrollToSelected);
+
+    _itemsStream.add(temp);
+  }
+
+  void _refreshSelectedScrollTarget(
+    List<T> items, {
+    bool scrollToSelected = false,
+  }) {
+    if (!_scrollToSelectedItem) {
+      _selectedItemIndex = null;
+      _setCanScrollToSelectedItem(false);
+      _scrollToSelectedAttempts = 0;
+      return;
+    }
+
+    final int index = items.indexWhere(_isSelectedItem);
+    if (index < 0) {
+      _selectedItemIndex = null;
+      _setCanScrollToSelectedItem(false);
+      _scrollToSelectedAttempts = 0;
+      return;
+    }
+
+    _selectedItemIndex = index;
+    _setCanScrollToSelectedItem(true);
+    _scrollToSelectedAttempts = 0;
+    if (scrollToSelected) {
+      _scheduleScrollToSelectedItem();
+    }
+  }
+
+  void _setCanScrollToSelectedItem(bool value) {
+    if (_canScrollToSelectedItemNotifier.value == value) {
+      return;
+    }
+
+    _canScrollToSelectedItemNotifier.value = value;
+  }
+
+  void _scrollToSelectedItemNow() {
+    _scrollToSelectedAttempts = 0;
+    _scheduleScrollToSelectedItem();
+  }
+
+  void _scheduleScrollToSelectedItem() {
+    if (_selectedItemIndex == null || _scrollToSelectedScheduled) {
+      return;
+    }
+
+    _scrollToSelectedScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToSelectedScheduled = false;
+      if (!mounted || _selectedItemIndex == null) {
+        return;
+      }
+
+      if (!_autoScrollController.hasClients) {
+        if (_scrollToSelectedAttempts < 3) {
+          _scrollToSelectedAttempts++;
+          _scheduleScrollToSelectedItem();
+        }
+        return;
+      }
+
+      unawaited(
+        _autoScrollController.scrollToIndex(
+          _selectedItemIndex!,
+          preferPosition: AutoScrollPosition.middle,
+          duration: const Duration(milliseconds: 180),
+        ),
+      );
+      _scrollToSelectedAttempts = 0;
+    });
   }
 
   void _addErrorToStream(Object error, [StackTrace? stackTrace]) {
@@ -529,86 +643,133 @@ class SelectionWidgetState<T> extends State<SelectionWidget<T>> {
                   SingleActivator(LogicalKeyboardKey.space):
                       DoNothingAndStopPropagationTextIntent(),
                 },
-                child: TextField(
-                  enableIMEPersonalizedLearning: widget.popupProps
-                      .searchFieldProps.enableIMEPersonalizedLearning,
-                  clipBehavior: widget.popupProps.searchFieldProps.clipBehavior,
-                  style: widget.popupProps.searchFieldProps.style,
-                  controller: searchBoxController,
-                  focusNode: widget.popupProps.searchFieldProps.focusNode,
-                  autofocus: widget.popupProps.searchFieldProps.autofocus,
-                  decoration: widget.popupProps.searchFieldProps.decoration,
-                  keyboardType: widget.popupProps.searchFieldProps.keyboardType,
-                  textInputAction:
-                      widget.popupProps.searchFieldProps.textInputAction,
-                  textCapitalization:
-                      widget.popupProps.searchFieldProps.textCapitalization,
-                  strutStyle: widget.popupProps.searchFieldProps.strutStyle,
-                  textAlign: widget.popupProps.searchFieldProps.textAlign,
-                  textAlignVertical:
-                      widget.popupProps.searchFieldProps.textAlignVertical,
-                  textDirection:
-                      widget.popupProps.searchFieldProps.textDirection,
-                  readOnly: widget.popupProps.searchFieldProps.readOnly,
-                  contextMenuBuilder:
-                      widget.popupProps.searchFieldProps.contextMenuBuilder,
-                  showCursor: widget.popupProps.searchFieldProps.showCursor,
-                  obscuringCharacter:
-                      widget.popupProps.searchFieldProps.obscuringCharacter,
-                  obscureText: widget.popupProps.searchFieldProps.obscureText,
-                  autocorrect: widget.popupProps.searchFieldProps.autocorrect,
-                  smartDashesType:
-                      widget.popupProps.searchFieldProps.smartDashesType,
-                  smartQuotesType:
-                      widget.popupProps.searchFieldProps.smartQuotesType,
-                  enableSuggestions:
-                      widget.popupProps.searchFieldProps.enableSuggestions,
-                  maxLines: widget.popupProps.searchFieldProps.maxLines,
-                  minLines: widget.popupProps.searchFieldProps.minLines,
-                  expands: widget.popupProps.searchFieldProps.expands,
-                  maxLengthEnforcement:
-                      widget.popupProps.searchFieldProps.maxLengthEnforcement,
-                  maxLength: widget.popupProps.searchFieldProps.maxLength,
-                  onAppPrivateCommand:
-                      widget.popupProps.searchFieldProps.onAppPrivateCommand,
-                  inputFormatters:
-                      widget.popupProps.searchFieldProps.inputFormatters,
-                  enabled: widget.popupProps.searchFieldProps.enabled,
-                  cursorWidth: widget.popupProps.searchFieldProps.cursorWidth,
-                  cursorHeight: widget.popupProps.searchFieldProps.cursorHeight,
-                  cursorRadius: widget.popupProps.searchFieldProps.cursorRadius,
-                  cursorColor: widget.popupProps.searchFieldProps.cursorColor,
-                  selectionHeightStyle:
-                      widget.popupProps.searchFieldProps.selectionHeightStyle,
-                  selectionWidthStyle:
-                      widget.popupProps.searchFieldProps.selectionWidthStyle,
-                  keyboardAppearance:
-                      widget.popupProps.searchFieldProps.keyboardAppearance,
-                  scrollPadding:
-                      widget.popupProps.searchFieldProps.scrollPadding,
-                  dragStartBehavior:
-                      widget.popupProps.searchFieldProps.dragStartBehavior,
-                  enableInteractiveSelection: widget
-                      .popupProps.searchFieldProps.enableInteractiveSelection,
-                  selectionControls:
-                      widget.popupProps.searchFieldProps.selectionControls,
-                  onTap: widget.popupProps.searchFieldProps.onTap,
-                  mouseCursor: widget.popupProps.searchFieldProps.mouseCursor,
-                  buildCounter: widget.popupProps.searchFieldProps.buildCounter,
-                  scrollController:
-                      widget.popupProps.searchFieldProps.scrollController,
-                  scrollPhysics:
-                      widget.popupProps.searchFieldProps.scrollPhysics,
-                  autofillHints:
-                      widget.popupProps.searchFieldProps.autofillHints,
-                  restorationId:
-                      widget.popupProps.searchFieldProps.restorationId,
-                  onSubmitted: widget.popupProps.searchFieldProps.onSubmitted,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _canScrollToSelectedItemNotifier,
+                  builder: (context, canScrollToSelectedItem, child) {
+                    return TextField(
+                      enableIMEPersonalizedLearning: widget.popupProps
+                          .searchFieldProps.enableIMEPersonalizedLearning,
+                      clipBehavior:
+                          widget.popupProps.searchFieldProps.clipBehavior,
+                      style: widget.popupProps.searchFieldProps.style,
+                      controller: searchBoxController,
+                      focusNode: widget.popupProps.searchFieldProps.focusNode,
+                      autofocus: widget.popupProps.searchFieldProps.autofocus,
+                      decoration: _searchFieldDecoration(
+                        context,
+                        canScrollToSelectedItem,
+                      ),
+                      keyboardType:
+                          widget.popupProps.searchFieldProps.keyboardType,
+                      textInputAction:
+                          widget.popupProps.searchFieldProps.textInputAction,
+                      textCapitalization:
+                          widget.popupProps.searchFieldProps.textCapitalization,
+                      strutStyle: widget.popupProps.searchFieldProps.strutStyle,
+                      textAlign: widget.popupProps.searchFieldProps.textAlign,
+                      textAlignVertical:
+                          widget.popupProps.searchFieldProps.textAlignVertical,
+                      textDirection:
+                          widget.popupProps.searchFieldProps.textDirection,
+                      readOnly: widget.popupProps.searchFieldProps.readOnly,
+                      contextMenuBuilder:
+                          widget.popupProps.searchFieldProps.contextMenuBuilder,
+                      showCursor: widget.popupProps.searchFieldProps.showCursor,
+                      obscuringCharacter:
+                          widget.popupProps.searchFieldProps.obscuringCharacter,
+                      obscureText:
+                          widget.popupProps.searchFieldProps.obscureText,
+                      autocorrect:
+                          widget.popupProps.searchFieldProps.autocorrect,
+                      smartDashesType:
+                          widget.popupProps.searchFieldProps.smartDashesType,
+                      smartQuotesType:
+                          widget.popupProps.searchFieldProps.smartQuotesType,
+                      enableSuggestions:
+                          widget.popupProps.searchFieldProps.enableSuggestions,
+                      maxLines: widget.popupProps.searchFieldProps.maxLines,
+                      minLines: widget.popupProps.searchFieldProps.minLines,
+                      expands: widget.popupProps.searchFieldProps.expands,
+                      maxLengthEnforcement: widget
+                          .popupProps.searchFieldProps.maxLengthEnforcement,
+                      maxLength: widget.popupProps.searchFieldProps.maxLength,
+                      onAppPrivateCommand: widget
+                          .popupProps.searchFieldProps.onAppPrivateCommand,
+                      inputFormatters:
+                          widget.popupProps.searchFieldProps.inputFormatters,
+                      enabled: widget.popupProps.searchFieldProps.enabled,
+                      cursorWidth:
+                          widget.popupProps.searchFieldProps.cursorWidth,
+                      cursorHeight:
+                          widget.popupProps.searchFieldProps.cursorHeight,
+                      cursorRadius:
+                          widget.popupProps.searchFieldProps.cursorRadius,
+                      cursorColor:
+                          widget.popupProps.searchFieldProps.cursorColor,
+                      selectionHeightStyle: widget
+                          .popupProps.searchFieldProps.selectionHeightStyle,
+                      selectionWidthStyle: widget
+                          .popupProps.searchFieldProps.selectionWidthStyle,
+                      keyboardAppearance:
+                          widget.popupProps.searchFieldProps.keyboardAppearance,
+                      scrollPadding:
+                          widget.popupProps.searchFieldProps.scrollPadding,
+                      dragStartBehavior:
+                          widget.popupProps.searchFieldProps.dragStartBehavior,
+                      enableInteractiveSelection: widget.popupProps
+                          .searchFieldProps.enableInteractiveSelection,
+                      selectionControls:
+                          widget.popupProps.searchFieldProps.selectionControls,
+                      onTap: widget.popupProps.searchFieldProps.onTap,
+                      mouseCursor:
+                          widget.popupProps.searchFieldProps.mouseCursor,
+                      buildCounter:
+                          widget.popupProps.searchFieldProps.buildCounter,
+                      scrollController:
+                          widget.popupProps.searchFieldProps.scrollController,
+                      scrollPhysics:
+                          widget.popupProps.searchFieldProps.scrollPhysics,
+                      autofillHints:
+                          widget.popupProps.searchFieldProps.autofillHints,
+                      restorationId:
+                          widget.popupProps.searchFieldProps.restorationId,
+                      onSubmitted:
+                          widget.popupProps.searchFieldProps.onSubmitted,
+                    );
+                  },
                 ),
               ),
             ),
           )
       ],
+    );
+  }
+
+  InputDecoration _searchFieldDecoration(
+    BuildContext context,
+    bool canScrollToSelectedItem,
+  ) {
+    final InputDecoration decoration =
+        widget.popupProps.searchFieldProps.decoration;
+    final ScrollToSelectedItemBuilder? scrollButtonBuilder =
+        widget.popupProps.scrollToSelectedItemBuilder;
+    if (!_scrollToSelectedItem || scrollButtonBuilder == null) {
+      return decoration;
+    }
+
+    final Widget scrollButton = scrollButtonBuilder(
+      context,
+      canScrollToSelectedItem ? _scrollToSelectedItemNow : null,
+    );
+    final Widget? suffixIcon = decoration.suffixIcon;
+    return decoration.copyWith(
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (suffixIcon != null) suffixIcon,
+          scrollButton,
+        ],
+      ),
     );
   }
 
